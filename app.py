@@ -6,7 +6,10 @@ import cloudinary, cloudinary.uploader
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'lawren103secret')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///lawren.db')
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///lawren.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
