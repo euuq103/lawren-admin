@@ -92,19 +92,18 @@ def api_characters():
     result = []
     for w in worlds:
         chars = Character.query.filter_by(world_id=w.id, is_public=True).order_by(Character.order).all()
-        if chars:
-            result.append({
-                'world_id': w.id,
-                'world_name': w.name,
-                'characters': [{
-                    'id': c.id,
-                    'name': c.name,
-                    'description': c.description,
-                    'image_url': c.image_url,
-                    'thumb_url': c.thumb_url,
-                    'order': c.order
-                } for c in chars]
-            })
+        result.append({
+            'world_id': w.id,
+            'world_name': w.name,
+            'characters': [{
+                'id': c.id,
+                'name': c.name,
+                'description': c.description,
+                'image_url': c.image_url,
+                'thumb_url': c.thumb_url,
+                'order': c.order
+            } for c in chars]
+        })
     return jsonify(result)
 
 @app.route('/api/news')
