@@ -304,6 +304,7 @@ def character_edit(id):
         ch.name        = request.form.get('name', ch.name).strip()
         ch.description = request.form.get('description', ch.description).strip()
         ch.image_url   = request.form.get('image_url', ch.image_url).strip()
+        ch.thumb_url   = request.form.get('thumb_url', ch.thumb_url).strip()
         ch.world_id    = int(request.form.get('world_id') or ch.world_id)
         ch.order       = int(request.form.get('order') or ch.order)
         db.session.commit()
