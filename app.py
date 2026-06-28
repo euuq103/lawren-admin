@@ -5,7 +5,7 @@ from models import db, World, Episode, EpisodePage, Character, News
 import cloudinary, cloudinary.uploader
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', '')
+app.secret_key = os.environ.get('SECRET_KEY', 'lawren103secret')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///lawren.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
