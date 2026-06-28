@@ -99,10 +99,22 @@
           <input class="inp" type="number" name="order" placeholder="순서" style="width:70px">
         </div>
 
-        <!-- 이미지 -->
+        <!-- 얼굴 썸네일 -->
         <div class="img-row">
+          <span style="font-size:0.68rem;color:var(--muted);width:60px;flex-shrink:0;">얼굴</span>
+          <input class="inp" type="text" name="thumb_url" id="addThumbUrl"
+                 placeholder="얼굴 이미지 URL" style="width:230px" oninput="prev('addThumbPrev',this.value)">
+          <span style="color:var(--cdim);font-size:0.72rem">또는</span>
+          <input type="file" id="addThumbFile" accept="image/*" style="display:none" onchange="uploadFile(this,'addThumbUrl','addThumbPrev','addThumbUploading')">
+          <button type="button" class="upload-btn" onclick="document.getElementById('addThumbFile').click()">파일 선택</button>
+          <span id="addThumbUploading" class="uploading">업로드 중...</span>
+          <img id="addThumbPrev" class="thumb" src="" alt="">
+        </div>
+        <!-- 전신샷 -->
+        <div class="img-row">
+          <span style="font-size:0.68rem;color:var(--muted);width:60px;flex-shrink:0;">전신샷</span>
           <input class="inp" type="text" name="image_url" id="addUrl"
-                 placeholder="이미지 URL" style="width:260px" oninput="prev('addPrev',this.value)">
+                 placeholder="전신 이미지 URL" style="width:230px" oninput="prev('addPrev',this.value)">
           <span style="color:var(--cdim);font-size:0.72rem">또는</span>
           <input type="file" id="addFile" accept="image/*" style="display:none" onchange="uploadFile(this,'addUrl','addPrev','addUploading')">
           <button type="button" class="upload-btn" onclick="document.getElementById('addFile').click()">파일 선택</button>
@@ -150,9 +162,25 @@
                   </select>
                   <input class="inp" type="number" name="order" value="{{ ch.order }}" style="width:70px" placeholder="순서">
                 </div>
+                <!-- 얼굴 썸네일 -->
                 <div class="img-row">
+                  <span style="font-size:0.68rem;color:var(--muted);width:60px;flex-shrink:0;">얼굴</span>
+                  <input class="inp" type="text" name="thumb_url" id="eturl{{ ch.id }}"
+                         value="{{ ch.thumb_url or '' }}" placeholder="얼굴 이미지 URL" style="width:220px"
+                         oninput="prev('etp{{ ch.id }}',this.value)">
+                  <span style="color:var(--cdim);font-size:0.72rem">또는</span>
+                  <input type="file" id="etf{{ ch.id }}" accept="image/*" style="display:none"
+                         onchange="uploadFile(this,'eturl{{ ch.id }}','etp{{ ch.id }}','etu{{ ch.id }}')">
+                  <button type="button" class="upload-btn" onclick="document.getElementById('etf{{ ch.id }}').click()">파일 선택</button>
+                  <span id="etu{{ ch.id }}" class="uploading">업로드 중...</span>
+                  <img id="etp{{ ch.id }}" class="thumb {{ 'show' if ch.thumb_url }}"
+                       src="{{ ch.thumb_url or '' }}" alt="">
+                </div>
+                <!-- 전신샷 -->
+                <div class="img-row">
+                  <span style="font-size:0.68rem;color:var(--muted);width:60px;flex-shrink:0;">전신샷</span>
                   <input class="inp" type="text" name="image_url" id="eurl{{ ch.id }}"
-                         value="{{ ch.image_url }}" placeholder="이미지 URL" style="width:250px"
+                         value="{{ ch.image_url }}" placeholder="전신 이미지 URL" style="width:220px"
                          oninput="prev('ep{{ ch.id }}',this.value)">
                   <span style="color:var(--cdim);font-size:0.72rem">또는</span>
                   <input type="file" id="ef{{ ch.id }}" accept="image/*" style="display:none"

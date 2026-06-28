@@ -45,14 +45,17 @@ class Character(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     name        = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, default='')
-    image_url   = db.Column(db.String(500), default='')
+    thumb_url   = db.Column(db.String(500), default='')   # 얼굴 썸네일 (버튼용)
+    image_url   = db.Column(db.String(500), default='')   # 전신샷 (메인 뷰어용)
     world_id    = db.Column(db.Integer, db.ForeignKey('world.id'), nullable=False)
     order       = db.Column(db.Integer, default=0)
+    is_public   = db.Column(db.Boolean, default=True)
 
     def to_dict(self):
         return {
             'id': self.id, 'name': self.name,
             'description': self.description,
+            'thumb_url': self.thumb_url,
             'image_url': self.image_url,
             'world_id': self.world_id, 'order': self.order
         }

@@ -21,6 +21,36 @@ cloudinary.config(
 
 with app.app_context():
     db.create_all()
+    # 기존 DB에 신규 컬럼 마이그레이션
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as con:
+            con.execute(text('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT ""'))
+            con.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as con:
+            con.execute(text('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1'))
+            con.commit()
+    except Exception:
+        pass
+    # thumb_url / is_public 컬럼 마이그레이션 (기존 DB 호환)
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as con:
+            con.execute(text('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT ""'))
+            con.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as con:
+            con.execute(text('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1'))
+            con.commit()
+    except Exception:
+        pass
 
 def guard():
     if not session.get('admin'):
@@ -250,6 +280,7 @@ def character_add():
         db.session.add(Character(
             name=name,
             description=request.form.get('description', '').strip(),
+            thumb_url=request.form.get('thumb_url', '').strip(),
             image_url=request.form.get('image_url', '').strip(),
             world_id=world_id, order=order
         ))
