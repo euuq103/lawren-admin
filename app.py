@@ -11,10 +11,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+# ★ 실제 값은 절대 여기 쓰지 않음 — Render 환경변수에서 주입
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'your_password_here')  # ← 여기 비번 입력
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
-    api_key    = os.environ.get('CLOUDINARY_API_KEY', '967891663199822'),
+    api_key    = os.environ.get('CLOUDINARY_API_KEY', ''),
     api_secret = os.environ.get('CLOUDINARY_API_SECRET', '')
 )
 
@@ -46,6 +47,26 @@ def api_episodes():
         q = q.filter_by(world_id=int(world_id))
     eps = q.order_by(Episode.order).all()
     return jsonify([e.to_dict() for e in eps])
+
+@app.route('/api/characters')
+def api_characters():
+    worlds = World.query.order_by(World.order).all()
+    result = []
+    for w in worlds:
+        chars = Character.query.filter_by(world_id=w.id, is_public=True).order_by(Character.order).all()
+        if chars:
+            result.append({
+                'world_id': w.id,
+                'world_name': w.name,
+                'characters': [{
+                    'id': c.id,
+                    'name': c.name,
+                    'description': c.description,
+                    'image_url': c.image_url,
+                    'order': c.order
+                } for c in chars]
+            })
+    return jsonify(result)
 
 @app.route('/api/news')
 def api_news():
