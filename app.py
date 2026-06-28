@@ -74,10 +74,15 @@ def api_worlds():
 
 @app.route('/api/episodes')
 def api_episodes():
-    world_id = request.args.get('world_id')
+    world_id   = request.args.get('world_id')
+    world_name = request.args.get('world_name')
     q = Episode.query.filter_by(is_public=True)
     if world_id:
         q = q.filter_by(world_id=int(world_id))
+    elif world_name:
+        w = World.query.filter(World.name.ilike(world_name)).first()
+        if w:
+            q = q.filter_by(world_id=w.id)
     eps = q.order_by(Episode.order).all()
     return jsonify([e.to_dict() for e in eps])
 
@@ -96,6 +101,7 @@ def api_characters():
                     'name': c.name,
                     'description': c.description,
                     'image_url': c.image_url,
+                    'thumb_url': c.thumb_url,
                     'order': c.order
                 } for c in chars]
             })
