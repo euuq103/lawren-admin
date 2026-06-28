@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ ep.title }} — 페이지 관리</title>
+  <style>
+    :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; }
+
+    nav { display:flex; align-items:center; padding:14px 32px; border-bottom:1px solid var(--border); gap:16px; }
+    .back { color:var(--muted); text-decoration:none; font-size:0.8rem; letter-spacing:0.1em; transition:color .15s; }
+    .back:hover { color:var(--cyan); }
+    .nav-title { flex:1; font-size:0.82rem; color:var(--text); letter-spacing:0.12em; }
+    .logout { color:var(--red); text-decoration:none; font-size:0.75rem; opacity:.55; transition:opacity .15s; }
+    .logout:hover { opacity:1; }
+
+    .page { max-width:1100px; margin:0 auto; padding:32px 28px; display:grid; grid-template-columns:340px 1fr; gap:32px; align-items:start; }
+    .label { font-size:0.65rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+
+    /* 업로드 패널 */
+    .upload-panel { background:var(--surface); border:1px solid var(--border); padding:20px; position:sticky; top:20px; }
+
+    .drop-zone {
+      border:2px dashed var(--cdim); padding:32px 20px; text-align:center;
+      cursor:pointer; transition:border-color .2s, background .2s; margin-bottom:16px;
+    }
+    .drop-zone:hover, .drop-zone.drag { border-color:var(--cyan); background:rgba(47,211,224,.03); }
+    .drop-zone p { color:var(--muted); font-size:0.82rem; line-height:1.7; }
+    .drop-zone span { color:var(--cyan); }
+    #fileInput { display:none; }
+
+    .queue { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:280px; overflow-y:auto; }
+    .q-item {
+      display:flex; align-items:center; gap:10px; background:#0d0d0d;
+      border:1px solid var(--border); padding:8px 10px;
+    }
+    .q-thumb { width:42px; height:42px; object-fit:cover; border:1px solid var(--cdim); flex-shrink:0; }
+    .q-name { flex:1; font-size:0.76rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .q-status { font-size:0.72rem; white-space:nowrap; }
+    .q-status.wait    { color:var(--cdim); }
+    .q-status.ing     { color:var(--cyan); }
+    .q-status.done    { color:#4ade80; }
+    .q-status.err     { color:var(--red); }
+
+    .btn-upload {
+      width:100%; background:transparent; border:1px solid var(--cyan); color:var(--cyan);
+      padding:9px; cursor:pointer; font-size:0.82rem; letter-spacing:0.1em; font-family:inherit;
+      transition:background .15s;
+    }
+    .btn-upload:hover { background:rgba(47,211,224,.07); }
+    .btn-upload:disabled { opacity:.4; cursor:not-allowed; }
+
+    .progress-wrap { margin-top:12px; height:3px; background:var(--cdim); display:none; }
+    .progress-bar  { height:100%; background:var(--cyan); width:0; transition:width .2s; }
+
+    /* 페이지 목록 */
+    .pages-panel {}
+
+    .pages-grid {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:12px; margin-bottom:24px;
+    }
+    .pg-card {
+      border:1px solid var(--border); background:var(--surface);
+      position:relative; overflow:hidden;
+    }
+    .pg-card img { width:100%; display:block; object-fit:cover; aspect-ratio:9/14; }
+    .pg-card .pg-order {
+      position:absolute; top:6px; left:6px;
+      background:rgba(2,2,2,.8); color:var(--cyan);
+      font-size:0.68rem; padding:2px 7px; letter-spacing:.06em;
+    }
+    .pg-card .pg-del {
+      position:absolute; top:6px; right:6px;
+      background:rgba(2,2,2,.8); border:1px solid #3a1010; color:#5a2020;
+      font-size:0.72rem; padding:2px 8px; cursor:pointer; font-family:inherit;
+      transition:color .15s, border-color .15s;
+    }
+    .pg-card .pg-del:hover { color:var(--red); border-color:var(--red); }
+
+    /* 웹툰 미리보기 */
+    .preview-btn {
+      background:transparent; border:1px solid var(--cdim); color:var(--muted);
+      padding:6px 14px; cursor:pointer; font-size:0.76rem; font-family:inherit;
+      transition:all .15s; margin-bottom:16px;
+    }
+    .preview-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+
+    .webtoon-preview {
+      display:none; max-width:500px; margin:0 auto;
+      border:1px solid var(--border);
+    }
+    .webtoon-preview img { width:100%; display:block; }
+
+    .empty { color:#253a3a; font-size:0.84rem; padding:24px 0; }
+
+    @media(max-width:760px){
+      .page { grid-template-columns:1fr; }
+      .upload-panel { position:static; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/admin/episodes" class="back">← 에피소드 목록</a>
+  <span class="nav-title">{{ ep.title }}</span>
+  <a href="/admin/logout" class="logout">logout</a>
+</nav>
+
+<div class="page">
+
+  <!-- 업로드 패널 -->
+  <div class="upload-panel">
+    <p class="label">페이지 이미지 업로드</p>
+
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <p>클릭하거나 파일을 여기에 드래그<br><span>PNG / JPG — 여러 파일 동시 선택 가능</span></p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+
+    <div class="queue" id="queue"></div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <button class="btn-upload" id="uploadBtn" disabled>업로드 시작</button>
+  </div>
+
+  <!-- 페이지 목록 -->
+  <div class="pages-panel">
+    <p class="label">등록된 페이지 ({{ pages|length }}장)</p>
+
+    {% if pages %}
+    <button class="preview-btn" onclick="togglePreview()">▶ 웹툰 미리보기</button>
+    <div class="webtoon-preview" id="wtPreview">
+      {% for p in pages %}
+      <img src="{{ p.image_url }}" alt="p{{ p.order }}">
+      {% endfor %}
+    </div>
+
+    <div class="pages-grid" id="pagesGrid">
+      {% for p in pages %}
+      <div class="pg-card" data-id="{{ p.id }}">
+        <img src="{{ p.image_url }}" alt="page {{ p.order }}">
+        <span class="pg-order">{{ p.order }}</span>
+        <a href="/admin/episodes/{{ ep.id }}/pages/delete/{{ p.id }}"
+           onclick="return confirm('이 페이지를 삭제할까요?')">
+          <button class="pg-del">✕</button>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">아직 등록된 페이지가 없습니다. 왼쪽에서 이미지를 업로드해주세요.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+var EP_ID = {{ ep.id }};
+var queue = [];
+
+// 드래그앤드롭
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.classList.remove('drag');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+document.getElementById('fileInput').addEventListener('change', function(){
+  addFiles(Array.from(this.files));
+  this.value = '';
+});
+
+function addFiles(files) {
+  files = files.filter(function(f){ return f.type.startsWith('image/'); });
+  files.forEach(function(f){
+    var item = { file: f, status: 'wait', url: null };
+    queue.push(item);
+  });
+  renderQueue();
+  document.getElementById('uploadBtn').disabled = queue.length === 0;
+}
+
+function renderQueue() {
+  var el = document.getElementById('queue');
+  el.innerHTML = '';
+  queue.forEach(function(item, i){
+    var url = item.url || URL.createObjectURL(item.file);
+    var statusText = { wait:'대기', ing:'업로드 중...', done:'완료', err:'실패' }[item.status];
+    el.innerHTML += '<div class="q-item">' +
+      '<img class="q-thumb" src="'+url+'">' +
+      '<span class="q-name">'+item.file.name+'</span>' +
+      '<span class="q-status '+item.status+'">'+statusText+'</span>' +
+      '</div>';
+  });
+}
+
+// 업로드
+document.getElementById('uploadBtn').addEventListener('click', async function(){
+  if (!queue.length) return;
+  this.disabled = true;
+  var pw = document.getElementById('progressWrap');
+  var pb = document.getElementById('progressBar');
+  pw.style.display = 'block';
+  var done = 0;
+
+  for (var i = 0; i < queue.length; i++) {
+    if (queue[i].status === 'done') { done++; continue; }
+    queue[i].status = 'ing';
+    renderQueue();
+
+    var fd = new FormData();
+    fd.append('file', queue[i].file);
+    try {
+      var res = await fetch('/admin/upload', { method:'POST', body: fd });
+      var data = await res.json();
+      if (data.url) {
+        // DB에 페이지 저장
+        var fv = new FormData();
+        fv.append('image_url', data.url);
+        await fetch('/admin/episodes/'+EP_ID+'/pages/add', { method:'POST', body: fv });
+        queue[i].status = 'done';
+        queue[i].url = data.url;
+      } else {
+        queue[i].status = 'err';
+      }
+    } catch(e) {
+      queue[i].status = 'err';
+    }
+    done++;
+    pb.style.width = Math.round(done/queue.length*100) + '%';
+    renderQueue();
+  }
+
+  // 완료 후 페이지 새로고침
+  var allDone = queue.every(function(q){ return q.status === 'done'; });
+  if (allDone) {
+    setTimeout(function(){ location.reload(); }, 600);
+  } else {
+    document.getElementById('uploadBtn').disabled = false;
+  }
+});
+
+function togglePreview() {
+  var el = document.getElementById('wtPreview');
+  var btn = document.querySelector('.preview-btn');
+  if (el.style.display === 'block') {
+    el.style.display = 'none'; btn.textContent = '▶ 웹툰 미리보기';
+  } else {
+    el.style.display = 'block'; btn.textContent = '▼ 미리보기 닫기';
+  }
+}
+</script>
+</body>
+</html>

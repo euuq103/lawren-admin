@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Episodes — Admin</title>
+  <style>
+    :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; }
+
+    nav { display:flex; align-items:center; padding:14px 32px; border-bottom:1px solid var(--border); }
+    .tabs { display:flex; gap:2px; flex:1; }
+    .tabs a { padding:6px 20px; color:var(--muted); text-decoration:none; font-size:0.8rem; letter-spacing:0.12em; border-bottom:2px solid transparent; transition:color .15s; }
+    .tabs a:hover { color:var(--text); }
+    .tabs a.on { color:var(--cyan); border-bottom-color:var(--cyan); }
+    .logout { color:var(--red); text-decoration:none; font-size:0.75rem; opacity:.55; transition:opacity .15s; }
+    .logout:hover { opacity:1; }
+
+    .page { max-width:900px; margin:0 auto; padding:36px 28px; }
+    .label { font-size:0.65rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+
+    .add-card { background:var(--surface); border:1px solid var(--border); padding:18px 22px; margin-bottom:30px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .inp { background:transparent; border:none; border-bottom:1px solid var(--border); color:var(--text); padding:6px 2px; font-size:0.87rem; font-family:inherit; outline:none; transition:border-color .15s; }
+    .inp:focus { border-bottom-color:var(--cyan); }
+    select.inp { cursor:pointer; }
+    select.inp option { background:#0a0a0a; }
+    .cb { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--muted); cursor:pointer; }
+    .btn { background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:6px 16px; cursor:pointer; font-size:0.78rem; letter-spacing:0.1em; font-family:inherit; transition:background .15s; }
+    .btn:hover { background:rgba(47,211,224,.07); }
+
+    table { width:100%; border-collapse:collapse; }
+    thead tr { border-bottom:1px solid var(--border); }
+    th { padding:8px 10px; font-size:0.65rem; letter-spacing:0.16em; color:var(--muted); font-weight:normal; text-align:left; text-transform:uppercase; }
+    td { padding:11px 10px; font-size:0.85rem; border-bottom:1px solid #0d0d0d; vertical-align:middle; }
+    tbody tr:hover td { background:#070707; }
+
+    .tag { font-size:0.7rem; color:var(--muted); }
+    .num { font-size:0.75rem; color:var(--cdim); }
+
+    .tog { background:transparent; border:1px solid var(--cdim); color:var(--muted); padding:3px 10px; cursor:pointer; font-size:0.72rem; font-family:inherit; transition:all .15s; }
+    .tog:hover { border-color:var(--cyan); color:var(--cyan); }
+    .tog.on { border-color:var(--cyan); color:var(--cyan); }
+
+    .ic { background:transparent; border:none; color:#2a3a3a; padding:3px 8px; cursor:pointer; font-size:0.75rem; font-family:inherit; transition:color .15s; }
+    .ic.edit:hover { color:var(--cyan); }
+    .ic.del:hover  { color:var(--red); }
+
+    /* 페이지 관리 버튼 */
+    .ic.pages {
+      border:1px solid var(--cdim); color:var(--muted);
+      padding:3px 10px; transition:all .15s; text-decoration:none; display:inline-block;
+    }
+    .ic.pages:hover { border-color:var(--cyan); color:var(--cyan); }
+
+    .page-count { font-size:0.7rem; color:var(--cdim); }
+
+    .erow { display:none; }
+    .erow td { padding:12px 10px; background:#060606; }
+    .eform { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .esave { background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:4px 14px; cursor:pointer; font-size:0.76rem; font-family:inherit; }
+    .esave:hover { background:rgba(47,211,224,.07); }
+    .ecancel { background:transparent; border:none; color:var(--muted); padding:4px 8px; cursor:pointer; font-size:0.76rem; font-family:inherit; }
+    .ecancel:hover { color:var(--text); }
+    .empty { color:#253a3a; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="tabs">
+    <a href="/admin/episodes" class="on">Episodes</a>
+    <a href="/admin/characters">Characters</a>
+    <a href="/admin/news">News</a>
+  </div>
+  <a href="/admin/logout" class="logout">logout</a>
+</nav>
+
+<div class="page">
+  <p class="label">새 에피소드</p>
+  <div class="add-card">
+    <form method="POST" action="/admin/episodes/add">
+      <div class="row">
+        <input class="inp" type="text" name="title" placeholder="에피소드 제목" required style="width:200px">
+        <select class="inp" name="world_id" style="width:140px">
+          <option value="">세계관 선택</option>
+          {% for w in worlds %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+        </select>
+        <input class="inp" type="number" name="order" placeholder="순서" style="width:70px">
+        <label class="cb"><input type="checkbox" name="is_public"> 공개</label>
+        <button class="btn" type="submit">+ 추가</button>
+      </div>
+    </form>
+  </div>
+
+  <p class="label">목록</p>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>제목</th><th>세계관</th><th>순서</th><th>페이지</th><th>공개</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% if episodes %}
+      {% for ep in episodes %}
+      <tr>
+        <td class="tag">{{ ep.id }}</td>
+        <td>{{ ep.title }}</td>
+        <td><span class="tag">{{ ep.world.name if ep.world else '—' }}</span></td>
+        <td><span class="num">{{ ep.order }}</span></td>
+        <td>
+          <a href="/admin/episodes/{{ ep.id }}/pages" class="ic pages">
+            🖼 {{ ep.pages|length }}장
+          </a>
+        </td>
+        <td>
+          <a href="/admin/episodes/toggle/{{ ep.id }}">
+            <button class="tog {{ 'on' if ep.is_public }}">{{ '● 공개' if ep.is_public else '○ 비공개' }}</button>
+          </a>
+        </td>
+        <td style="white-space:nowrap">
+          <button class="ic edit" onclick="tog({{ ep.id }})">수정</button>
+          <a href="/admin/episodes/delete/{{ ep.id }}" onclick="return confirm('삭제?')">
+            <button class="ic del">삭제</button>
+          </a>
+        </td>
+      </tr>
+      <tr class="erow" id="e{{ ep.id }}">
+        <td colspan="7">
+          <form class="eform" method="POST" action="/admin/episodes/edit/{{ ep.id }}">
+            <input class="inp" type="text" name="title" value="{{ ep.title }}" style="width:190px">
+            <select class="inp" name="world_id" style="width:130px">
+              <option value="">세계관 없음</option>
+              {% for w in worlds %}
+              <option value="{{ w.id }}" {{ 'selected' if ep.world_id == w.id }}>{{ w.name }}</option>
+              {% endfor %}
+            </select>
+            <input class="inp" type="number" name="order" value="{{ ep.order }}" style="width:70px" placeholder="순서">
+            <button class="esave" type="submit">저장</button>
+            <button class="ecancel" type="button" onclick="tog({{ ep.id }})">취소</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    {% else %}
+      <tr><td colspan="7" class="empty">등록된 에피소드가 없습니다.</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function tog(id) {
+  var r = document.getElementById('e'+id);
+  r.style.display = r.style.display === 'table-row' ? 'none' : 'table-row';
+}
+</script>
+</body>
+</html>

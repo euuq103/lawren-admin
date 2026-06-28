@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Characters — Admin</title>
+  <style>
+    :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; }
+
+    nav { display:flex; align-items:center; padding:14px 32px; border-bottom:1px solid var(--border); }
+    .tabs { display:flex; gap:2px; flex:1; }
+    .tabs a { padding:6px 20px; color:var(--muted); text-decoration:none; font-size:0.8rem; letter-spacing:0.12em; border-bottom:2px solid transparent; transition:color .15s; }
+    .tabs a:hover { color:var(--text); }
+    .tabs a.on { color:var(--cyan); border-bottom-color:var(--cyan); }
+    .logout { color:var(--red); text-decoration:none; font-size:0.75rem; opacity:.55; transition:opacity .15s; }
+    .logout:hover { opacity:1; }
+
+    .page { max-width:960px; margin:0 auto; padding:36px 28px; }
+    .label { font-size:0.65rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+    .section { margin-bottom:44px; }
+
+    .add-card { background:var(--surface); border:1px solid var(--border); padding:18px 22px; margin-bottom:28px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px; }
+    .inp { background:transparent; border:none; border-bottom:1px solid var(--border); color:var(--text); padding:6px 2px; font-size:0.87rem; font-family:inherit; outline:none; transition:border-color .15s; }
+    .inp:focus { border-bottom-color:var(--cyan); }
+    select.inp { cursor:pointer; }
+    select.inp option { background:#0a0a0a; }
+    textarea.inp { border:1px solid var(--border); padding:8px; resize:vertical; min-height:68px; width:100%; max-width:460px; font-size:0.84rem; }
+    textarea.inp:focus { border-color:var(--cyan); }
+
+    /* 이미지 업로드 영역 */
+    .img-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    .thumb { width:50px; height:50px; object-fit:cover; border:1px solid var(--border); display:none; }
+    .thumb.show { display:block; }
+    .hint { font-size:0.65rem; color:var(--cdim); }
+    .upload-btn {
+      background:transparent; border:1px solid var(--cdim); color:var(--muted);
+      padding:4px 12px; cursor:pointer; font-size:0.72rem; font-family:inherit; transition:all .15s;
+    }
+    .upload-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+    .uploading { color:var(--muted); font-size:0.72rem; display:none; }
+
+    .btn { background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:6px 16px; cursor:pointer; font-size:0.78rem; letter-spacing:0.1em; font-family:inherit; transition:background .15s; }
+    .btn:hover { background:rgba(47,211,224,.07); }
+
+    table { width:100%; border-collapse:collapse; }
+    thead tr { border-bottom:1px solid var(--border); }
+    th { padding:8px 10px; font-size:0.65rem; letter-spacing:0.16em; color:var(--muted); font-weight:normal; text-align:left; text-transform:uppercase; }
+    td { padding:10px 10px; font-size:0.85rem; border-bottom:1px solid #0d0d0d; vertical-align:middle; }
+    tbody tr:hover td { background:#070707; }
+    .img-td { width:52px; }
+    .img-td img { width:44px; height:44px; object-fit:cover; border:1px solid var(--border); }
+    .tag { font-size:0.7rem; color:var(--muted); }
+    .num { font-size:0.75rem; color:var(--cdim); }
+
+    .ic { background:transparent; border:none; color:#2a3a3a; padding:3px 8px; cursor:pointer; font-size:0.75rem; font-family:inherit; transition:color .15s; }
+    .ic.edit:hover { color:var(--cyan); }
+    .ic.del:hover  { color:var(--red); }
+
+    .erow { display:none; }
+    .erow td { padding:14px 10px; background:#060606; }
+    .einner { display:flex; flex-direction:column; gap:10px; }
+    .efields { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:4px; }
+    .esave { background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:4px 14px; cursor:pointer; font-size:0.76rem; font-family:inherit; }
+    .esave:hover { background:rgba(47,211,224,.07); }
+    .ecancel { background:transparent; border:none; color:var(--muted); padding:4px 8px; cursor:pointer; font-size:0.76rem; font-family:inherit; }
+    .ecancel:hover { color:var(--text); }
+    .empty { color:#253a3a; }
+
+    .world-hd { cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .arr { font-size:0.65rem; color:var(--cdim); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="tabs">
+    <a href="/admin/episodes">Episodes</a>
+    <a href="/admin/characters" class="on">Characters</a>
+    <a href="/admin/news">News</a>
+  </div>
+  <a href="/admin/logout" class="logout">logout</a>
+</nav>
+
+<div class="page">
+
+  <!-- 캐릭터 추가 -->
+  <div class="section">
+    <p class="label">새 캐릭터</p>
+    <div class="add-card">
+      <form method="POST" action="/admin/characters/add" id="addCharForm">
+        <div class="row">
+          <input class="inp" type="text" name="name" placeholder="캐릭터 이름" required style="width:170px">
+          <select class="inp" name="world_id" required style="width:150px">
+            <option value="">세계관 선택</option>
+            {% for w in worlds %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+          </select>
+          <input class="inp" type="number" name="order" placeholder="순서" style="width:70px">
+        </div>
+
+        <!-- 이미지 -->
+        <div class="img-row">
+          <input class="inp" type="text" name="image_url" id="addUrl"
+                 placeholder="이미지 URL" style="width:260px" oninput="prev('addPrev',this.value)">
+          <span style="color:var(--cdim);font-size:0.72rem">또는</span>
+          <input type="file" id="addFile" accept="image/*" style="display:none" onchange="uploadFile(this,'addUrl','addPrev','addUploading')">
+          <button type="button" class="upload-btn" onclick="document.getElementById('addFile').click()">파일 선택</button>
+          <span id="addUploading" class="uploading">업로드 중...</span>
+          <img id="addPrev" class="thumb" src="" alt="">
+        </div>
+
+        <div style="margin-bottom:14px">
+          <textarea class="inp" name="description" placeholder="캐릭터 설명"></textarea>
+        </div>
+        <button class="btn" type="submit">+ 추가</button>
+      </form>
+    </div>
+
+    <table>
+      <thead><tr><th></th><th>이름</th><th>세계관</th><th>순서</th><th></th></tr></thead>
+      <tbody>
+      {% if characters %}
+        {% for ch in characters %}
+        <tr>
+          <td class="img-td">
+            {% if ch.image_url %}<img src="{{ ch.image_url }}" alt="{{ ch.name }}">
+            {% else %}<span style="color:var(--cdim)">—</span>{% endif %}
+          </td>
+          <td>{{ ch.name }}</td>
+          <td><span class="tag">{{ ch.world.name }}</span></td>
+          <td><span class="num">{{ ch.order }}</span></td>
+          <td style="white-space:nowrap">
+            <button class="ic edit" onclick="togC({{ ch.id }})">수정</button>
+            <a href="/admin/characters/delete/{{ ch.id }}" onclick="return confirm('삭제?')">
+              <button class="ic del">삭제</button>
+            </a>
+          </td>
+        </tr>
+        <tr class="erow" id="c{{ ch.id }}">
+          <td colspan="5">
+            <form method="POST" action="/admin/characters/edit/{{ ch.id }}">
+              <div class="einner">
+                <div class="efields">
+                  <input class="inp" type="text" name="name" value="{{ ch.name }}" style="width:160px">
+                  <select class="inp" name="world_id" style="width:150px">
+                    {% for w in worlds %}
+                    <option value="{{ w.id }}" {{ 'selected' if ch.world_id == w.id }}>{{ w.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <input class="inp" type="number" name="order" value="{{ ch.order }}" style="width:70px" placeholder="순서">
+                </div>
+                <div class="img-row">
+                  <input class="inp" type="text" name="image_url" id="eurl{{ ch.id }}"
+                         value="{{ ch.image_url }}" placeholder="이미지 URL" style="width:250px"
+                         oninput="prev('ep{{ ch.id }}',this.value)">
+                  <span style="color:var(--cdim);font-size:0.72rem">또는</span>
+                  <input type="file" id="ef{{ ch.id }}" accept="image/*" style="display:none"
+                         onchange="uploadFile(this,'eurl{{ ch.id }}','ep{{ ch.id }}','eu{{ ch.id }}')">
+                  <button type="button" class="upload-btn" onclick="document.getElementById('ef{{ ch.id }}').click()">파일 선택</button>
+                  <span id="eu{{ ch.id }}" class="uploading">업로드 중...</span>
+                  <img id="ep{{ ch.id }}" class="thumb {{ 'show' if ch.image_url }}"
+                       src="{{ ch.image_url }}" alt="">
+                </div>
+                <div>
+                  <textarea class="inp" name="description" style="width:100%;max-width:440px">{{ ch.description }}</textarea>
+                </div>
+                <div>
+                  <button class="esave" type="submit">저장</button>
+                  <button class="ecancel" type="button" onclick="togC({{ ch.id }})">취소</button>
+                </div>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="5" class="empty">등록된 캐릭터가 없습니다.</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 세계관 관리 (접힘) -->
+  <div class="section">
+    <p class="label world-hd" onclick="togW()">
+      세계관 관리 <span class="arr" id="warr">▶</span>
+    </p>
+    <div id="wPanel" style="display:none; margin-top:14px">
+      <div class="add-card">
+        <form method="POST" action="/admin/worlds/add">
+          <div class="row">
+            <input class="inp" type="text" name="name" placeholder="세계관 이름" required style="width:190px">
+            <button class="btn" type="submit">+ 추가</button>
+          </div>
+        </form>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>이름</th><th></th></tr></thead>
+        <tbody>
+        {% if worlds %}
+          {% for w in worlds %}
+          <tr>
+            <td class="tag">{{ w.id }}</td>
+            <td>{{ w.name }}</td>
+            <td><a href="/admin/worlds/delete/{{ w.id }}" onclick="return confirm('삭제?')">
+              <button class="ic del">삭제</button></a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="3" class="empty">없음</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function prev(id, url) {
+  var img = document.getElementById(id);
+  if (!img) return;
+  if (!url) { img.classList.remove('show'); return; }
+  img.src = url;
+  img.onload  = function() { img.classList.add('show'); };
+  img.onerror = function() { img.classList.remove('show'); };
+}
+
+function uploadFile(input, urlInputId, previewId, loadingId) {
+  var file = input.files[0];
+  if (!file) return;
+  var loading = document.getElementById(loadingId);
+  if (loading) { loading.style.display = 'inline'; }
+
+  var fd = new FormData();
+  fd.append('file', file);
+  fetch('/admin/upload', { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (loading) loading.style.display = 'none';
+      if (data.url) {
+        document.getElementById(urlInputId).value = data.url;
+        prev(previewId, data.url);
+      } else {
+        alert('업로드 실패: ' + (data.error || '알 수 없는 오류'));
+      }
+    })
+    .catch(function(e){
+      if (loading) loading.style.display = 'none';
+      alert('업로드 오류: ' + e);
+    });
+}
+
+function togC(id) {
+  var r = document.getElementById('c'+id);
+  r.style.display = r.style.display === 'table-row' ? 'none' : 'table-row';
+}
+function togW() {
+  var p = document.getElementById('wPanel');
+  var a = document.getElementById('warr');
+  var open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+  a.textContent   = open ? '▶' : '▼';
+}
+</script>
+</body>
+</html>
