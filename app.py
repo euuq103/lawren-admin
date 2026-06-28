@@ -11,11 +11,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
-# ★ 실제 값은 절대 여기 쓰지 않음 — Render 환경변수에서 주입
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
-    api_key    = '',
+    api_key    = os.environ.get('CLOUDINARY_API_KEY', '967891663199822'),
     api_secret = os.environ.get('CLOUDINARY_API_SECRET', '')
 )
 
