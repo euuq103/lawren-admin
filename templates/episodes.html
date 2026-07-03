@@ -116,9 +116,9 @@
           </a>
         </td>
         <td>
-          <a href="/admin/episodes/toggle/{{ ep.id }}">
-            <button class="tog {{ 'on' if ep.is_public }}">{{ '● 공개' if ep.is_public else '○ 비공개' }}</button>
-          </a>
+          <form method="POST" action="/admin/episodes/toggle/{{ ep.id }}" style="display:inline">
+            <button class="tog {{ 'on' if ep.is_public }}" type="submit">{{ '● 공개' if ep.is_public else '○ 비공개' }}</button>
+          </form>
         </td>
         <td style="white-space:nowrap">
           <button class="ic edit" onclick="tog({{ ep.id }})">수정</button>

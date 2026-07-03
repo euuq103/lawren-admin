@@ -24,7 +24,6 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
-# ★ 실제 값은 절대 여기 쓰지 않음 — Render 환경변수에서 주입
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'your_password_here')  # ← 여기 비번 입력
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
@@ -176,7 +175,8 @@ def episode_add():
     r = guard()
     if r: return r
     title    = request.form.get('title', '').strip()
-    world_id = request.form.get('world_id') or None
+    _wid     = request.form.get('world_id')
+    world_id = int(_wid) if _wid else None
     is_pub   = request.form.get('is_public') == 'on'
     alias    = request.form.get('alias', '').strip()
     order    = int(request.form.get('order') or 0) or Episode.query.count() + 1
@@ -185,7 +185,7 @@ def episode_add():
         db.session.commit()
     return redirect('/admin/episodes')
 
-@app.route('/admin/episodes/toggle/<int:id>')
+@app.route('/admin/episodes/toggle/<int:id>', methods=['POST'])
 def episode_toggle(id):
     r = guard()
     if r: return r
@@ -202,7 +202,8 @@ def episode_edit(id):
     ep = Episode.query.get(id)
     if ep:
         ep.title    = request.form.get('title', ep.title).strip()
-        ep.world_id = request.form.get('world_id') or None
+        _wid        = request.form.get('world_id')
+        ep.world_id = int(_wid) if _wid else None
         ep.alias    = request.form.get('alias', ep.alias).strip()
         ep.order    = int(request.form.get('order') or ep.order)
         db.session.commit()
@@ -469,6 +470,13 @@ def admin_restore():
     try:
         data = json.load(f)
     except Exception:
+        return redirect('/admin/backup-page?error=1')
+
+    # 안전장치: 백업 파일 구조가 맞는지 확인 후에만 기존 데이터 삭제 진행
+    # (엉뚱한 JSON을 올려도 DB가 통째로 날아가지 않도록 방지)
+    if not isinstance(data, dict) or not any(
+        isinstance(data.get(k), list) for k in ('worlds', 'characters', 'episodes', 'news')
+    ):
         return redirect('/admin/backup-page?error=1')
 
     # 기존 데이터 전체 삭제 (자식 테이블부터)
