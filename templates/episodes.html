@@ -87,6 +87,7 @@
           {% for w in worlds %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
         </select>
         <input class="inp" type="number" name="order" placeholder="순서" style="width:70px">
+        <input class="inp" type="text" name="alias" placeholder="별칭 (쉼표로 구분, 선택)" style="width:200px">
         <label class="cb"><input type="checkbox" name="is_public"> 공개</label>
         <button class="btn" type="submit">+ 추가</button>
       </div>
@@ -120,9 +121,9 @@
         </td>
         <td style="white-space:nowrap">
           <button class="ic edit" onclick="tog({{ ep.id }})">수정</button>
-          <a href="/admin/episodes/delete/{{ ep.id }}" onclick="return confirm('삭제?')">
-            <button class="ic del">삭제</button>
-          </a>
+          <form method="POST" action="/admin/episodes/delete/{{ ep.id }}" style="display:inline" onsubmit="return confirm('삭제?')">
+            <button class="ic del" type="submit">삭제</button>
+          </form>
         </td>
       </tr>
       <tr class="erow" id="e{{ ep.id }}">
@@ -136,6 +137,7 @@
               {% endfor %}
             </select>
             <input class="inp" type="number" name="order" value="{{ ep.order }}" style="width:70px" placeholder="순서">
+            <input class="inp" type="text" name="alias" value="{{ ep.alias or '' }}" placeholder="별칭 (쉼표로 구분)" style="width:200px">
             <button class="esave" type="submit">저장</button>
             <button class="ecancel" type="button" onclick="tog({{ ep.id }})">취소</button>
           </form>

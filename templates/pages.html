@@ -146,10 +146,9 @@
       <div class="pg-card" data-id="{{ p.id }}">
         <img src="{{ p.image_url }}" alt="page {{ p.order }}">
         <span class="pg-order">{{ p.order }}</span>
-        <a href="/admin/episodes/{{ ep.id }}/pages/delete/{{ p.id }}"
-           onclick="return confirm('이 페이지를 삭제할까요?')">
-          <button class="pg-del">✕</button>
-        </a>
+        <form method="POST" action="/admin/episodes/{{ ep.id }}/pages/delete/{{ p.id }}" style="display:inline" onsubmit="return confirm('이 페이지를 삭제할까요?')">
+          <button class="pg-del" type="submit">✕</button>
+        </form>
       </div>
       {% endfor %}
     </div>

@@ -128,9 +128,9 @@
           </td>
           <td>{{ n.order }}</td>
           <td>
-            <a href="/admin/news/delete/{{ n.id }}" onclick="return confirm('삭제할까요?')">
-              <button class="btn-del">삭제</button>
-            </a>
+            <form method="POST" action="/admin/news/delete/{{ n.id }}" style="display:inline" onsubmit="return confirm('삭제할까요?')">
+              <button class="btn-del" type="submit">삭제</button>
+            </form>
           </td>
         </tr>
         {% endfor %}

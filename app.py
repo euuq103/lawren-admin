@@ -1,4 +1,5 @@
 import os
+import time
 from flask import Flask, jsonify, request, render_template, redirect, session
 from flask_cors import CORS
 from models import db, World, Episode, EpisodePage, Character, News
@@ -11,10 +12,15 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 쿠키 보안 (운영 = postgres 사용 중일 때만 SECURE 강제, 로컬 sqlite 개발은 http 허용)
+_is_prod = _db_url.startswith('postgresql://')
+app.config['SESSION_COOKIE_SECURE']   = _is_prod
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
-# ★ 실제 값은 절대 여기 쓰지 않음 — Render 환경변수에서 주입
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'your_password_here')  # ← 여기 비번 입력
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
@@ -22,42 +28,36 @@ cloudinary.config(
     api_secret = os.environ.get('CLOUDINARY_API_SECRET', '')
 )
 
-with app.app_context():
-    db.create_all()
-    # 기존 DB에 신규 컬럼 마이그레이션
+def _try_migrate(sql):
+    """기존 DB에 신규 컬럼을 안전하게 추가 (이미 있으면 조용히 무시)"""
     try:
         from sqlalchemy import text
         with db.engine.connect() as con:
-            con.execute(text('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT ""'))
-            con.commit()
-    except Exception:
-        pass
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as con:
-            con.execute(text('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1'))
-            con.commit()
-    except Exception:
-        pass
-    # thumb_url / is_public 컬럼 마이그레이션 (기존 DB 호환)
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as con:
-            con.execute(text('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT ""'))
-            con.commit()
-    except Exception:
-        pass
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as con:
-            con.execute(text('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1'))
+            con.execute(text(sql))
             con.commit()
     except Exception:
         pass
 
+with app.app_context():
+    db.create_all()
+    # 기존 DB 호환용 컬럼 마이그레이션 (이미 컬럼이 있으면 그냥 실패하고 넘어감)
+    _try_migrate('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1')
+    _try_migrate('ALTER TABLE character ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+
 def guard():
     if not session.get('admin'):
         return redirect('/admin')
+
+# ── 로그인 시도 제한 (메모리 기반, 간단한 무차별 대입 방어) ──
+_login_attempts = {}   # ip -> {'count': int, 'locked_until': float}
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_SECONDS = 300  # 5분
+
+def _client_ip():
+    fwd = request.headers.get('X-Forwarded-For', '')
+    return fwd.split(',')[0].strip() if fwd else request.remote_addr
 
 # ══ 공개 API ════════════════════════════════════
 
@@ -101,7 +101,8 @@ def api_characters():
                 'description': c.description,
                 'image_url': c.image_url,
                 'thumb_url': c.thumb_url,
-                'order': c.order
+                'order': c.order,
+                'alias': c.alias or ''
             } for c in chars]
         })
     return jsonify(result)
@@ -118,9 +119,21 @@ def admin_login():
     if session.get('admin'):
         return redirect('/admin/episodes')
     if request.method == 'POST':
+        ip = _client_ip()
+        rec = _login_attempts.get(ip, {'count': 0, 'locked_until': 0})
+        now = time.time()
+        if rec['locked_until'] > now:
+            wait = int(rec['locked_until'] - now)
+            return render_template('login.html', error=f'너무 많이 틀렸어요. {wait}초 후 다시 시도하세요.')
         if request.form.get('password') == ADMIN_PASSWORD:
             session['admin'] = True
+            _login_attempts.pop(ip, None)
             return redirect('/admin/episodes')
+        rec['count'] += 1
+        if rec['count'] >= MAX_LOGIN_ATTEMPTS:
+            rec['locked_until'] = now + LOCKOUT_SECONDS
+            rec['count'] = 0
+        _login_attempts[ip] = rec
         return render_template('login.html', error='비밀번호가 틀렸습니다.')
     return render_template('login.html')
 
@@ -161,9 +174,10 @@ def episode_add():
     title    = request.form.get('title', '').strip()
     world_id = request.form.get('world_id') or None
     is_pub   = request.form.get('is_public') == 'on'
+    alias    = request.form.get('alias', '').strip()
     order    = int(request.form.get('order') or 0) or Episode.query.count() + 1
     if title:
-        db.session.add(Episode(title=title, world_id=world_id, is_public=is_pub, order=order))
+        db.session.add(Episode(title=title, world_id=world_id, is_public=is_pub, alias=alias, order=order))
         db.session.commit()
     return redirect('/admin/episodes')
 
@@ -185,11 +199,12 @@ def episode_edit(id):
     if ep:
         ep.title    = request.form.get('title', ep.title).strip()
         ep.world_id = request.form.get('world_id') or None
+        ep.alias    = request.form.get('alias', ep.alias).strip()
         ep.order    = int(request.form.get('order') or ep.order)
         db.session.commit()
     return redirect('/admin/episodes')
 
-@app.route('/admin/episodes/delete/<int:id>')
+@app.route('/admin/episodes/delete/<int:id>', methods=['POST'])
 def episode_delete(id):
     r = guard()
     if r: return r
@@ -221,7 +236,7 @@ def page_add(ep_id):
     db.session.commit()
     return redirect(f'/admin/episodes/{ep_id}/pages')
 
-@app.route('/admin/episodes/<int:ep_id>/pages/delete/<int:page_id>')
+@app.route('/admin/episodes/<int:ep_id>/pages/delete/<int:page_id>', methods=['POST'])
 def page_delete(ep_id, page_id):
     r = guard()
     if r: return r
@@ -257,7 +272,7 @@ def world_add():
         db.session.commit()
     return redirect(request.referrer or '/admin/characters')
 
-@app.route('/admin/worlds/delete/<int:id>')
+@app.route('/admin/worlds/delete/<int:id>', methods=['POST'])
 def world_delete(id):
     r = guard()
     if r: return r
@@ -290,6 +305,7 @@ def character_add():
             description=request.form.get('description', '').strip(),
             thumb_url=request.form.get('thumb_url', '').strip(),
             image_url=request.form.get('image_url', '').strip(),
+            alias=request.form.get('alias', '').strip(),
             world_id=world_id, order=order
         ))
         db.session.commit()
@@ -305,12 +321,13 @@ def character_edit(id):
         ch.description = request.form.get('description', ch.description).strip()
         ch.image_url   = request.form.get('image_url', ch.image_url).strip()
         ch.thumb_url   = request.form.get('thumb_url', ch.thumb_url).strip()
+        ch.alias       = request.form.get('alias', ch.alias).strip()
         ch.world_id    = int(request.form.get('world_id') or ch.world_id)
         ch.order       = int(request.form.get('order') or ch.order)
         db.session.commit()
     return redirect('/admin/characters')
 
-@app.route('/admin/characters/delete/<int:id>')
+@app.route('/admin/characters/delete/<int:id>', methods=['POST'])
 def character_delete(id):
     r = guard()
     if r: return r
@@ -345,7 +362,7 @@ def admin_news_add():
     db.session.commit()
     return redirect('/admin/news')
 
-@app.route('/admin/news/delete/<int:nid>')
+@app.route('/admin/news/delete/<int:nid>', methods=['POST'])
 def admin_news_delete(nid):
     if not session.get('admin'):
         return redirect('/admin')

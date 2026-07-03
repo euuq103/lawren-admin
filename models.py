@@ -20,6 +20,7 @@ class Episode(db.Model):
     order     = db.Column(db.Integer, default=0)
     is_public = db.Column(db.Boolean, default=False)
     world_id  = db.Column(db.Integer, db.ForeignKey('world.id'), nullable=True)
+    alias     = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂月")
     pages     = db.relationship('EpisodePage', backref='episode', lazy=True,
                                 cascade='all, delete-orphan', order_by='EpisodePage.order')
 
@@ -27,6 +28,7 @@ class Episode(db.Model):
         return {
             'id': self.id, 'title': self.title,
             'order': self.order, 'world_id': self.world_id,
+            'alias': self.alias or '',
             'pages': [p.to_dict() for p in self.pages]
         }
 
@@ -50,6 +52,7 @@ class Character(db.Model):
     world_id    = db.Column(db.Integer, db.ForeignKey('world.id'), nullable=False)
     order       = db.Column(db.Integer, default=0)
     is_public   = db.Column(db.Boolean, default=True)
+    alias       = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂月")
 
     def to_dict(self):
         return {
@@ -57,7 +60,8 @@ class Character(db.Model):
             'description': self.description,
             'thumb_url': self.thumb_url,
             'image_url': self.image_url,
-            'world_id': self.world_id, 'order': self.order
+            'world_id': self.world_id, 'order': self.order,
+            'alias': self.alias or ''
         }
 
 
