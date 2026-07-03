@@ -1,7 +1,10 @@
 import os
 import time
-from flask import Flask, jsonify, request, render_template, redirect, session
+import json
+from io import BytesIO
+from flask import Flask, jsonify, request, render_template, redirect, session, send_file
 from flask_cors import CORS
+from sqlalchemy import text
 from models import db, World, Episode, EpisodePage, Character, News
 import cloudinary, cloudinary.uploader
 
@@ -21,6 +24,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
+# ★ 실제 값은 절대 여기 쓰지 않음 — Render 환경변수에서 주입
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'your_password_here')  # ← 여기 비번 입력
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
@@ -370,6 +374,154 @@ def admin_news_delete(nid):
     db.session.delete(n)
     db.session.commit()
     return redirect('/admin/news')
+
+
+# ══ 백업 / 복원 ════════════════════════════════════
+
+@app.route('/admin/backup')
+def admin_backup():
+    if not session.get('admin'):
+        return redirect('/admin')
+    data = {
+        'worlds': [{'id': w.id, 'name': w.name, 'order': w.order} for w in World.query.all()],
+        'characters': [{
+            'id': c.id, 'name': c.name, 'description': c.description,
+            'thumb_url': c.thumb_url, 'image_url': c.image_url,
+            'world_id': c.world_id, 'order': c.order,
+            'is_public': c.is_public, 'alias': c.alias
+        } for c in Character.query.all()],
+        'episodes': [{
+            'id': e.id, 'title': e.title, 'order': e.order,
+            'is_public': e.is_public, 'world_id': e.world_id, 'alias': e.alias,
+            'pages': [{'id': p.id, 'image_url': p.image_url, 'order': p.order} for p in e.pages]
+        } for e in Episode.query.all()],
+        'news': [{
+            'id': n.id, 'date': n.date, 'tag': n.tag,
+            'text': n.text, 'url': n.url, 'order': n.order
+        } for n in News.query.all()]
+    }
+    buf = BytesIO(json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'))
+    filename = 'lawren103_backup_' + time.strftime('%Y%m%d_%H%M%S') + '.json'
+    return send_file(buf, mimetype='application/json', as_attachment=True, download_name=filename)
+
+
+@app.route('/admin/backup-page')
+def admin_backup_page():
+    if not session.get('admin'):
+        return redirect('/admin')
+    msg = ''
+    if request.args.get('success'):
+        msg = '<p style="color:#4caf50">✅ 복원 완료!</p>'
+    elif request.args.get('error'):
+        msg = '<p style="color:#f44336">❌ 오류: JSON 파일을 확인해주세요.</p>'
+    # DB 만료일: Render 무료 Postgres는 생성 후 30일 뒤 만료.
+    # Render 대시보드 > DB > Info 배너에서 정확한 날짜 확인 후 아래 값만 갱신하면 됨.
+    DB_EXPIRE_DATE = "2026-07-29"
+
+    return f'''
+    <html><body style="font-family:sans-serif;padding:30px;background:#111;color:#eee">
+      <h2>백업 / 복원</h2>
+      {msg}
+      <div id="expireBox" style="padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:15px;"></div>
+      <p><a href="/admin/backup" style="color:#4caf50;font-size:18px">📥 지금 백업 다운로드</a></p>
+      <hr style="border-color:#333">
+      <form method="POST" action="/admin/restore" enctype="multipart/form-data"
+            onsubmit="return confirm('현재 DB 데이터를 전부 지우고 백업 파일 내용으로 교체합니다. 계속할까요?')">
+        <p>⚠ 복원하면 현재 DB 내용은 전부 지워지고 백업 파일 내용으로 바뀝니다.</p>
+        <input type="file" name="backup_file" accept="application/json" required>
+        <button type="submit" style="background:#f44336;color:#fff;padding:6px 14px;border:none;border-radius:4px;">복원 실행</button>
+      </form>
+      <p style="margin-top:30px"><a href="/admin" style="color:#888">← 관리자 메인으로</a></p>
+      <script>
+        (function(){{
+          var expire = new Date("{DB_EXPIRE_DATE}T00:00:00");
+          var today = new Date();
+          today.setHours(0,0,0,0);
+          var days = Math.ceil((expire - today) / 86400000);
+          var box = document.getElementById('expireBox');
+          var color, text;
+          if (days < 0) {{
+            color = '#f44336'; text = '⚠ DB 만료일(' + "{DB_EXPIRE_DATE}" + ')이 지났어요! 대시보드 확인 필요';
+          }} else if (days <= 5) {{
+            color = '#f44336'; text = '🚨 DB 만료까지 D-' + days + ' (' + "{DB_EXPIRE_DATE}" + ') — 지금 백업하고 업그레이드 검토하세요';
+          }} else if (days <= 10) {{
+            color = '#ff9800'; text = '⏳ DB 만료까지 D-' + days + ' (' + "{DB_EXPIRE_DATE}" + ')';
+          }} else {{
+            color = '#4caf50'; text = '✅ DB 만료까지 D-' + days + ' (' + "{DB_EXPIRE_DATE}" + ') — 아직 여유 있음';
+          }}
+          box.style.background = color + '22';
+          box.style.border = '1px solid ' + color;
+          box.style.color = color;
+          box.textContent = text;
+        }})();
+      </script>
+    </body></html>
+    '''
+
+
+@app.route('/admin/restore', methods=['POST'])
+def admin_restore():
+    if not session.get('admin'):
+        return redirect('/admin')
+    f = request.files.get('backup_file')
+    if not f:
+        return redirect('/admin/backup-page?error=1')
+    try:
+        data = json.load(f)
+    except Exception:
+        return redirect('/admin/backup-page?error=1')
+
+    # 기존 데이터 전체 삭제 (자식 테이블부터)
+    EpisodePage.query.delete()
+    Episode.query.delete()
+    Character.query.delete()
+    World.query.delete()
+    News.query.delete()
+    db.session.commit()
+
+    for w in data.get('worlds', []):
+        db.session.add(World(id=w['id'], name=w['name'], order=w.get('order', 0)))
+    db.session.commit()
+
+    for c in data.get('characters', []):
+        db.session.add(Character(
+            id=c['id'], name=c['name'], description=c.get('description', ''),
+            thumb_url=c.get('thumb_url', ''), image_url=c.get('image_url', ''),
+            world_id=c['world_id'], order=c.get('order', 0),
+            is_public=c.get('is_public', True), alias=c.get('alias', '')
+        ))
+    db.session.commit()
+
+    for e in data.get('episodes', []):
+        db.session.add(Episode(
+            id=e['id'], title=e['title'], order=e.get('order', 0),
+            is_public=e.get('is_public', False), world_id=e.get('world_id'),
+            alias=e.get('alias', '')
+        ))
+        db.session.commit()
+        for p in e.get('pages', []):
+            db.session.add(EpisodePage(id=p['id'], episode_id=e['id'],
+                                        image_url=p['image_url'], order=p.get('order', 0)))
+    db.session.commit()
+
+    for n in data.get('news', []):
+        db.session.add(News(
+            id=n['id'], date=n['date'], tag=n.get('tag', 'UPDATE'),
+            text=n['text'], url=n.get('url', ''), order=n.get('order', 0)
+        ))
+    db.session.commit()
+
+    # PostgreSQL auto-increment 시퀀스 복원된 id 이후로 재조정
+    for tbl, seq in [('world', 'world_id_seq'), ('character', 'character_id_seq'),
+                      ('episode', 'episode_id_seq'), ('episode_page', 'episode_page_id_seq'),
+                      ('news', 'news_id_seq')]:
+        try:
+            db.session.execute(text(f"SELECT setval('{seq}', COALESCE((SELECT MAX(id) FROM {tbl}), 1))"))
+        except Exception:
+            pass
+    db.session.commit()
+
+    return redirect('/admin/backup-page?success=1')
 
 
 if __name__ == '__main__':
