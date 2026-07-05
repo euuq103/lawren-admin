@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import time
 import json
@@ -358,7 +359,8 @@ def admin_news():
     if not session.get('admin'):
         return redirect('/admin')
     items = News.query.order_by(News.order).all()
-    return render_template('news.html', items=items)
+    today = datetime.now().strftime('%Y.%m.%d')
+    return render_template('news.html', items=items, today=today)
 
 @app.route('/admin/news/add', methods=['POST'])
 def admin_news_add():
