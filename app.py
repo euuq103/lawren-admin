@@ -166,9 +166,13 @@ def upload_image():
 def admin_episodes():
     r = guard()
     if r: return r
-    worlds   = World.query.order_by(World.order).all()
-    episodes = Episode.query.order_by(Episode.world_id, Episode.order).all()
-    return render_template('episodes.html', episodes=episodes, worlds=worlds)
+    worlds     = World.query.order_by(World.order).all()
+    filter_wid = request.args.get('world_id', type=int)
+    ep_query   = Episode.query
+    if filter_wid:
+        ep_query = ep_query.filter_by(world_id=filter_wid)
+    episodes   = ep_query.order_by(Episode.world_id, Episode.order).all()
+    return render_template('episodes.html', episodes=episodes, worlds=worlds, filter_wid=filter_wid or 0)
 
 @app.route('/admin/episodes/add', methods=['POST'])
 def episode_add():
@@ -293,9 +297,13 @@ def world_delete(id):
 def admin_characters():
     r = guard()
     if r: return r
-    worlds     = World.query.order_by(World.order).all()
-    characters = Character.query.order_by(Character.world_id, Character.order).all()
-    return render_template('characters.html', worlds=worlds, characters=characters)
+    worlds        = World.query.order_by(World.order).all()
+    filter_wid    = request.args.get('world_id', type=int)
+    char_query    = Character.query
+    if filter_wid:
+        char_query = char_query.filter_by(world_id=filter_wid)
+    characters    = char_query.order_by(Character.world_id, Character.order).all()
+    return render_template('characters.html', worlds=worlds, characters=characters, filter_wid=filter_wid or 0)
 
 @app.route('/admin/characters/add', methods=['POST'])
 def character_add():

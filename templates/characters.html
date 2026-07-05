@@ -70,6 +70,15 @@
 
     .world-hd { cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
     .arr { font-size:0.65rem; color:var(--cdim); }
+
+    /* 필터바 */
+    .filter-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+    .filter-bar select, .filter-bar input { background:transparent; border:1px solid var(--border); color:var(--text); padding:5px 10px; font-size:0.8rem; font-family:inherit; outline:none; transition:border-color .15s; }
+    .filter-bar select:focus, .filter-bar input:focus { border-color:var(--cyan); }
+    .filter-bar select option { background:#0a0a0a; }
+    .filter-bar a { color:var(--muted); text-decoration:none; font-size:0.75rem; }
+    .filter-bar a:hover { color:var(--cyan); }
+    .filter-count { font-size:0.7rem; color:var(--cdim); }
   </style>
 </head>
 <body>
@@ -133,12 +142,25 @@
       </form>
     </div>
 
+
+  <!-- 필터바 -->
+  <div class="filter-bar">
+    <select onchange="location.href=this.value?'?world_id='+this.value:'?'" id="worldFilter">
+      <option value="">전체 세계관</option>
+      {% for w in worlds %}
+      <option value="{{ w.id }}" {{ 'selected' if filter_wid == w.id }}>{{ w.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" id="charSearch" placeholder="이름 / 별칭 검색..." oninput="filterRows()" style="width:180px">
+    <span class="filter-count" id="charCount"></span>
+  </div>
+
     <table>
       <thead><tr><th></th><th>이름</th><th>세계관</th><th>순서</th><th></th></tr></thead>
       <tbody>
       {% if characters %}
         {% for ch in characters %}
-        <tr>
+        <tr data-name="{{ ch.name|lower }} {{ (ch.alias or '')|lower }}">
           <td class="img-td">
             {% if ch.image_url %}<img src="{{ ch.image_url }}" alt="{{ ch.name }}">
             {% else %}<span style="color:var(--cdim)">—</span>{% endif %}
@@ -299,6 +321,25 @@ function togW() {
   p.style.display = open ? 'none' : 'block';
   a.textContent   = open ? '▶' : '▼';
 }
+
+function filterRows() {
+  var q = document.getElementById('charSearch').value.toLowerCase();
+  var rows = document.querySelectorAll('tbody tr:not(.erow)');
+  var visible = 0;
+  rows.forEach(function(r) {
+    var name = r.getAttribute('data-name') || '';
+    if (!q || name.indexOf(q) !== -1) { r.style.display = ''; visible++; }
+    else { r.style.display = 'none'; }
+    // 수정 폼 행도 같이 숨김
+    var erow = r.nextElementSibling;
+    if (erow && erow.classList.contains('erow')) {
+      if (r.style.display === 'none') erow.style.display = 'none';
+    }
+  });
+  var countEl = document.getElementById('charCount');
+  if (countEl) countEl.textContent = visible + '명';
+}
+filterRows();
 </script>
 </body>
 </html>

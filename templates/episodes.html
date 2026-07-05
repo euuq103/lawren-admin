@@ -63,6 +63,13 @@
     .ecancel { background:transparent; border:none; color:var(--muted); padding:4px 8px; cursor:pointer; font-size:0.76rem; font-family:inherit; }
     .ecancel:hover { color:var(--text); }
     .empty { color:#253a3a; }
+
+    /* 필터바 */
+    .filter-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+    .filter-bar select, .filter-bar input { background:transparent; border:1px solid var(--border); color:var(--text); padding:5px 10px; font-size:0.8rem; font-family:inherit; outline:none; transition:border-color .15s; }
+    .filter-bar select:focus, .filter-bar input:focus { border-color:var(--cyan); }
+    .filter-bar select option { background:#0a0a0a; }
+    .filter-count { font-size:0.7rem; color:var(--cdim); }
   </style>
 </head>
 <body>
@@ -96,6 +103,17 @@
   </div>
 
   <p class="label">목록</p>
+  <div class="filter-bar">
+    <select onchange="location.href=this.value?'?world_id='+this.value:'?'" id="worldFilter">
+      <option value="">전체 세계관</option>
+      {% for w in worlds %}
+      <option value="{{ w.id }}" {{ 'selected' if filter_wid == w.id }}>{{ w.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" id="epSearch" placeholder="제목 / 별칭 검색..." oninput="filterEps()" style="width:180px">
+    <span class="filter-count" id="epCount"></span>
+  </div>
+
   <table>
     <thead>
       <tr>
@@ -105,7 +123,7 @@
     <tbody>
     {% if episodes %}
       {% for ep in episodes %}
-      <tr>
+      <tr data-name="{{ ep.title|lower }} {{ (ep.alias or '')|lower }}">
         <td class="tag">{{ ep.id }}</td>
         <td>{{ ep.title }}</td>
         <td><span class="tag">{{ ep.world.name if ep.world else '—' }}</span></td>
@@ -157,6 +175,24 @@ function tog(id) {
   var r = document.getElementById('e'+id);
   r.style.display = r.style.display === 'table-row' ? 'none' : 'table-row';
 }
+
+function filterEps() {
+  var q = document.getElementById('epSearch').value.toLowerCase();
+  var rows = document.querySelectorAll('tbody tr:not(.erow)');
+  var visible = 0;
+  rows.forEach(function(r) {
+    var name = r.getAttribute('data-name') || '';
+    if (!q || name.indexOf(q) !== -1) { r.style.display = ''; visible++; }
+    else { r.style.display = 'none'; }
+    var erow = r.nextElementSibling;
+    if (erow && erow.classList.contains('erow')) {
+      if (r.style.display === 'none') erow.style.display = 'none';
+    }
+  });
+  var countEl = document.getElementById('epCount');
+  if (countEl) countEl.textContent = visible + '개';
+}
+filterEps();
 </script>
 </body>
 </html>
