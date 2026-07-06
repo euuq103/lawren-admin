@@ -48,9 +48,9 @@ with app.app_context():
     _try_migrate('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1')
     _try_migrate('ALTER TABLE character ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
-    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_en VARCHAR(500) DEFAULT ''')
-    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT ''')
-    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT ''')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_en VARCHAR(500) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
 
 def guard():
