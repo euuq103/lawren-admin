@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>{{ ep.title }} — 페이지 관리</title>
   <style>
-    :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; }
+    :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; --gold:#d4a843; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; }
 
@@ -18,6 +18,23 @@
     .page { max-width:1100px; margin:0 auto; padding:32px 28px; display:grid; grid-template-columns:340px 1fr; gap:32px; align-items:start; }
     .label { font-size:0.65rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
 
+    /* 언어 탭 */
+    .lang-tabs {
+      display:flex; gap:0; margin-bottom:24px; border-bottom:1px solid var(--border);
+    }
+    .lang-tab {
+      padding:8px 20px; cursor:pointer; font-size:0.82rem; font-family:inherit;
+      background:transparent; border:none; border-bottom:2px solid transparent;
+      color:var(--muted); transition:all .15s; letter-spacing:0.06em;
+    }
+    .lang-tab:hover { color:var(--text); }
+    .lang-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+    .lang-tab .badge {
+      font-size:0.6rem; padding:1px 5px; margin-left:4px;
+      background:var(--cdim); color:var(--muted); border-radius:2px;
+    }
+    .lang-tab.active .badge { background:rgba(47,211,224,.15); color:var(--cyan); }
+
     /* 업로드 패널 */
     .upload-panel { background:var(--surface); border:1px solid var(--border); padding:20px; position:sticky; top:20px; }
 
@@ -29,6 +46,10 @@
     .drop-zone p { color:var(--muted); font-size:0.82rem; line-height:1.7; }
     .drop-zone span { color:var(--cyan); }
     #fileInput { display:none; }
+
+    .upload-hint {
+      font-size:0.72rem; color:var(--cdim); margin-bottom:12px; line-height:1.6;
+    }
 
     .queue { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:280px; overflow-y:auto; }
     .q-item {
@@ -79,6 +100,25 @@
     }
     .pg-card .pg-del:hover { color:var(--red); border-color:var(--red); }
 
+    /* 번역 미업로드 카드 */
+    .pg-card.empty-translated {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      aspect-ratio:9/14; border-style:dashed; border-color:var(--cdim);
+    }
+    .pg-card.empty-translated .pg-order { color:var(--muted); }
+    .pg-card.empty-translated .pg-upload-btn {
+      background:transparent; border:1px solid var(--cdim); color:var(--muted);
+      padding:6px 14px; cursor:pointer; font-size:0.76rem; font-family:inherit;
+      transition:all .15s; margin-top:8px;
+    }
+    .pg-card.empty-translated .pg-upload-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+    .pg-card.empty-translated .pg-empty-text {
+      font-size:0.7rem; color:var(--cdim); text-align:center; line-height:1.6;
+    }
+
+    /* 숨겨진 파일 입력 (페이지별 업로드용) */
+    .pg-file-input { display:none; }
+
     /* 웹툰 미리보기 */
     .preview-btn {
       background:transparent; border:1px solid var(--cdim); color:var(--muted);
@@ -92,6 +132,9 @@
       border:1px solid var(--border);
     }
     .webtoon-preview img { width:100%; display:block; }
+    .webtoon-preview .preview-empty {
+      padding:40px; text-align:center; color:var(--cdim); font-size:0.82rem;
+    }
 
     .empty { color:#253a3a; font-size:0.84rem; padding:24px 0; }
 
@@ -113,12 +156,17 @@
 
   <!-- 업로드 패널 -->
   <div class="upload-panel">
-    <p class="label">페이지 이미지 업로드</p>
+    <p class="label" id="uploadLabel">페이지 이미지 업로드</p>
 
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <p>클릭하거나 파일을 여기에 드래그<br><span>PNG / JPG — 여러 파일 동시 선택 가능</span></p>
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple>
+    <input type="file" class="pg-file-input" id="singleFileInput" accept="image/*">
+
+    <div class="upload-hint" id="uploadHint">
+      한국어 이미지를 순서대로 업로드하세요.
+    </div>
 
     <div class="queue" id="queue"></div>
 
@@ -131,26 +179,30 @@
 
   <!-- 페이지 목록 -->
   <div class="pages-panel">
-    <p class="label">등록된 페이지 ({{ pages|length }}장)</p>
+    <!-- 언어 탭 -->
+    <div class="lang-tabs">
+      <button class="lang-tab active" data-lang="ko" onclick="switchLang('ko')">
+        🇰🇷 한국어 <span class="badge" id="cnt-ko">0</span>
+      </button>
+      <button class="lang-tab" data-lang="en" onclick="switchLang('en')">
+        🇬🇧 영어 <span class="badge" id="cnt-en">0</span>
+      </button>
+      <button class="lang-tab" data-lang="ja" onclick="switchLang('ja')">
+        🇯🇵 일본어 <span class="badge" id="cnt-ja">0</span>
+      </button>
+      <button class="lang-tab" data-lang="ru" onclick="switchLang('ru')">
+        🇷🇺 러시아어 <span class="badge" id="cnt-ru">0</span>
+      </button>
+    </div>
+
+    <p class="label" id="pagesLabel">등록된 페이지 ({{ pages|length }}장)</p>
 
     {% if pages %}
     <button class="preview-btn" onclick="togglePreview()">▶ 웹툰 미리보기</button>
-    <div class="webtoon-preview" id="wtPreview">
-      {% for p in pages %}
-      <img src="{{ p.image_url }}" alt="p{{ p.order }}">
-      {% endfor %}
-    </div>
+    <div class="webtoon-preview" id="wtPreview"></div>
 
     <div class="pages-grid" id="pagesGrid">
-      {% for p in pages %}
-      <div class="pg-card" data-id="{{ p.id }}">
-        <img src="{{ p.image_url }}" alt="page {{ p.order }}">
-        <span class="pg-order">{{ p.order }}</span>
-        <form method="POST" action="/admin/episodes/{{ ep.id }}/pages/delete/{{ p.id }}" style="display:inline" onsubmit="return confirm('이 페이지를 삭제할까요?')">
-          <button class="pg-del" type="submit">✕</button>
-        </form>
-      </div>
-      {% endfor %}
+      <!-- JS renderPages()가 동적으로 채움 -->
     </div>
     {% else %}
     <p class="empty">아직 등록된 페이지가 없습니다. 왼쪽에서 이미지를 업로드해주세요.</p>
@@ -161,9 +213,148 @@
 
 <script>
 var EP_ID = {{ ep.id }};
+var CURRENT_LANG = 'ko';
 var queue = [];
 
-// 드래그앤드롭
+var LANG_LABELS = {
+  ko: '한국어', en: '영어', ja: '일본어', ru: '러시아어'
+};
+var LANG_HINTS = {
+  ko: '한국어 이미지를 순서대로 업로드하세요.',
+  en: '영어 번역 이미지를 업로드하세요. 빈 페이지는 한국어로 표시됩니다.',
+  ja: '일본어 번역 이미지를 업로드하세요. 빈 페이지는 한국어로 표시됩니다.',
+  ru: '러시아어 번역 이미지를 업로드하세요. 빈 페이지는 한국어로 표시됩니다.'
+};
+
+// 모든 페이지 데이터 (JSON으로 안전하게 주입)
+var pagesData = [
+  {% for p in pages %}
+  {"id": {{ p.id }}, "order": {{ p.order }}, "ko": {{ p.image_url|tojson }}, "en": {{ (p.image_url_en or '')|tojson }}, "ja": {{ (p.image_url_ja or '')|tojson }}, "ru": {{ (p.image_url_ru or '')|tojson }} },
+  {% endfor %}
+];
+
+// 언어 카운트 업데이트
+function updateCounts() {
+  var counts = { ko:0, en:0, ja:0, ru:0 };
+  pagesData.forEach(function(p) {
+    if (p.ko) counts.ko++;
+    if (p.en) counts.en++;
+    if (p.ja) counts.ja++;
+    if (p.ru) counts.ru++;
+  });
+  document.getElementById('cnt-ko').textContent = counts.ko;
+  document.getElementById('cnt-en').textContent = counts.en;
+  document.getElementById('cnt-ja').textContent = counts.ja;
+  document.getElementById('cnt-ru').textContent = counts.ru;
+}
+
+// 언어 전환
+function switchLang(lang) {
+  CURRENT_LANG = lang;
+  // 탭 활성화
+  document.querySelectorAll('.lang-tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.lang === lang);
+  });
+  // 힌트 텍스트
+  document.getElementById('uploadHint').textContent = LANG_HINTS[lang];
+  document.getElementById('uploadLabel').textContent = '페이지 이미지 업로드 (' + LANG_LABELS[lang] + ')';
+  // 페이지 그리드 재렌더
+  renderPages();
+  // 미리보기 닫기
+  document.getElementById('wtPreview').style.display = 'none';
+  document.querySelector('.preview-btn').textContent = '▶ 웹툰 미리보기';
+}
+
+// 페이지 그리드 렌더
+function renderPages() {
+  var grid = document.getElementById('pagesGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  pagesData.forEach(function(p) {
+    var url = p[CURRENT_LANG] || '';
+    var card = document.createElement('div');
+    card.className = 'pg-card' + (url ? '' : ' empty-translated');
+    card.dataset.id = p.id;
+    card.dataset.order = p.order;
+
+    var orderSpan = '<span class="pg-order">' + p.order + '</span>';
+
+    if (url) {
+      // 이미지 있음
+      card.innerHTML = '<img src="' + url + '" alt="page ' + p.order + '" class="pg-img">' + orderSpan;
+      if (CURRENT_LANG === 'ko') {
+        // 한국어: 완전 삭제 (페이지 레코드 삭제)
+        card.innerHTML += '<form method="POST" action="/admin/episodes/' + EP_ID + '/pages/delete/' + p.id + '" style="display:inline" onsubmit="return confirm(\'이 페이지를 삭제할까요?\')"><button class="pg-del" type="submit">✕</button></form>';
+      } else {
+        // 다국어: 번역 이미지만 삭제 (빈칸으로)
+        card.innerHTML += '<button class="pg-del" type="button" onclick="clearLangImage(' + p.id + ')">✕</button>';
+      }
+    } else {
+      // 이미지 없음 (번역 미업로드)
+      card.innerHTML = orderSpan + '<div class="pg-empty-text">번역 없음<br>(한국어 표시)</div>';
+      if (CURRENT_LANG !== 'ko') {
+        card.innerHTML += '<button class="pg-upload-btn" type="button" onclick="uploadSinglePage(' + p.id + ')">업로드</button>';
+      }
+    }
+    grid.appendChild(card);
+  });
+  updateCounts();
+}
+
+// 다국어 이미지 삭제 (빈칸으로)
+function clearLangImage(pageId) {
+  if (!confirm('이 ' + LANG_LABELS[CURRENT_LANG] + ' 번역 이미지를 삭제할까요? (한국어 원본은 유지됩니다)')) return;
+  var fd = new FormData();
+  fd.append('lang', CURRENT_LANG);
+  fetch('/admin/episodes/' + EP_ID + '/pages/' + pageId + '/clear-lang', {
+    method: 'POST', body: fd
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      // 로컬 데이터 업데이트
+      pagesData.forEach(function(p) {
+        if (p.id === pageId) p[CURRENT_LANG] = '';
+      });
+      renderPages();
+    }
+  });
+}
+
+// 페이지별 단일 업로드 (번역 탭에서)
+function uploadSinglePage(pageId) {
+  var input = document.getElementById('singleFileInput');
+  input.value = '';
+  input.onchange = function() {
+    if (!this.files || !this.files[0]) return;
+    var file = this.files[0];
+    // 1. Cloudinary 업로드
+    var fd = new FormData();
+    fd.append('file', file);
+    fetch('/admin/upload', { method: 'POST', body: fd })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.url) throw new Error('upload failed');
+        // 2. DB에 다국어 URL 저장
+        var fd2 = new FormData();
+        fd2.append('lang', CURRENT_LANG);
+        fd2.append('image_url', data.url);
+        return fetch('/admin/episodes/' + EP_ID + '/pages/' + pageId + '/set-lang', {
+          method: 'POST', body: fd2
+        }).then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.ok) {
+              pagesData.forEach(function(p) {
+                if (p.id === pageId) p[CURRENT_LANG] = data.url;
+              });
+              renderPages();
+            }
+          });
+      })
+      .catch(function(e) { alert('업로드 실패: ' + e.message); });
+  };
+  input.click();
+}
+
+// 드래그앤드롭 (한국어 탭에서만 일괄 업로드)
 var dz = document.getElementById('dropZone');
 dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
 dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
@@ -179,8 +370,7 @@ document.getElementById('fileInput').addEventListener('change', function(){
 function addFiles(files) {
   files = files.filter(function(f){ return f.type.startsWith('image/'); });
   files.forEach(function(f){
-    var item = { file: f, status: 'wait', url: null };
-    queue.push(item);
+    queue.push({ file: f, status: 'wait', url: null });
   });
   renderQueue();
   document.getElementById('uploadBtn').disabled = queue.length === 0;
@@ -189,7 +379,7 @@ function addFiles(files) {
 function renderQueue() {
   var el = document.getElementById('queue');
   el.innerHTML = '';
-  queue.forEach(function(item, i){
+  queue.forEach(function(item){
     var url = item.url || URL.createObjectURL(item.file);
     var statusText = { wait:'대기', ing:'업로드 중...', done:'완료', err:'실패' }[item.status];
     el.innerHTML += '<div class="q-item">' +
@@ -200,7 +390,7 @@ function renderQueue() {
   });
 }
 
-// 업로드
+// 업로드 실행
 document.getElementById('uploadBtn').addEventListener('click', async function(){
   if (!queue.length) return;
   this.disabled = true;
@@ -220,10 +410,25 @@ document.getElementById('uploadBtn').addEventListener('click', async function(){
       var res = await fetch('/admin/upload', { method:'POST', body: fd });
       var data = await res.json();
       if (data.url) {
-        // DB에 페이지 저장
-        var fv = new FormData();
-        fv.append('image_url', data.url);
-        await fetch('/admin/episodes/'+EP_ID+'/pages/add', { method:'POST', body: fv });
+        if (CURRENT_LANG === 'ko') {
+          // 한국어: 새 페이지 레코드 생성
+          var fv = new FormData();
+          fv.append('image_url', data.url);
+          await fetch('/admin/episodes/'+EP_ID+'/pages/add', { method:'POST', body: fv });
+        } else {
+          // 다국어: 기존 페이지에 URL 추가 (순서대로 매칭)
+          // 현재 큐의 순서가 페이지 순서와 일치한다고 가정
+          var pageIdx = done; // 0부터 시작
+          if (pagesData[pageIdx]) {
+            var fd2 = new FormData();
+            fd2.append('lang', CURRENT_LANG);
+            fd2.append('image_url', data.url);
+            await fetch('/admin/episodes/'+EP_ID+'/pages/'+pagesData[pageIdx].id+'/set-lang', {
+              method: 'POST', body: fd2
+            });
+            pagesData[pageIdx][CURRENT_LANG] = data.url;
+          }
+        }
         queue[i].status = 'done';
         queue[i].url = data.url;
       } else {
@@ -237,7 +442,6 @@ document.getElementById('uploadBtn').addEventListener('click', async function(){
     renderQueue();
   }
 
-  // 완료 후 페이지 새로고침
   var allDone = queue.every(function(q){ return q.status === 'done'; });
   if (allDone) {
     setTimeout(function(){ location.reload(); }, 600);
@@ -246,15 +450,34 @@ document.getElementById('uploadBtn').addEventListener('click', async function(){
   }
 });
 
+// 웹툰 미리보기
 function togglePreview() {
   var el = document.getElementById('wtPreview');
   var btn = document.querySelector('.preview-btn');
   if (el.style.display === 'block') {
     el.style.display = 'none'; btn.textContent = '▶ 웹툰 미리보기';
   } else {
+    // 현재 언어의 이미지로 미리보기 렌더
+    var html = '';
+    var hasAny = false;
+    pagesData.forEach(function(p) {
+      var url = p[CURRENT_LANG] || '';
+      if (url) {
+        html += '<img src="' + url + '" alt="p' + p.order + '">';
+        hasAny = true;
+      }
+    });
+    if (!hasAny) {
+      html = '<div class="preview-empty">이 언어의 번역 이미지가 아직 없습니다.</div>';
+    }
+    el.innerHTML = html;
     el.style.display = 'block'; btn.textContent = '▼ 미리보기 닫기';
   }
 }
+
+// 초기화
+renderPages();
+updateCounts();
 </script>
 </body>
 </html>

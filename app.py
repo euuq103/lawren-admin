@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import time
 import json
@@ -25,7 +25,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 공개 API만 허용
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'your_password_here')  # ← 여기 비번 입력
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 cloudinary.config(
     cloud_name = 'dmn9mxxqq',
     api_key    = os.environ.get('CLOUDINARY_API_KEY', ''),
@@ -48,6 +48,9 @@ with app.app_context():
     _try_migrate('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1')
     _try_migrate('ALTER TABLE character ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_en VARCHAR(500) DEFAULT ''')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT ''')
+    _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT ''')
     _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
 
 def guard():
@@ -270,6 +273,47 @@ def page_reorder(ep_id):
     db.session.commit()
     return jsonify({'ok': True})
 
+
+
+# ── 페이지 다국어 이미지 설정/삭제 ──
+@app.route("/admin/episodes/<int:ep_id>/pages/<int:page_id>/set-lang", methods=["POST"])
+def page_set_lang(ep_id, page_id):
+    r = guard()
+    if r: return r
+    p = EpisodePage.query.get_or_404(page_id)
+    if p.episode_id != ep_id:
+        return jsonify({"ok": False, "err": "mismatch"}), 400
+    lang = request.form.get("lang", "").strip()
+    url  = request.form.get("image_url", "").strip()
+    if lang == "en":
+        p.image_url_en = url
+    elif lang == "ja":
+        p.image_url_ja = url
+    elif lang == "ru":
+        p.image_url_ru = url
+    else:
+        return jsonify({"ok": False, "err": "bad lang"}), 400
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@app.route("/admin/episodes/<int:ep_id>/pages/<int:page_id>/clear-lang", methods=["POST"])
+def page_clear_lang(ep_id, page_id):
+    r = guard()
+    if r: return r
+    p = EpisodePage.query.get_or_404(page_id)
+    if p.episode_id != ep_id:
+        return jsonify({"ok": False, "err": "mismatch"}), 400
+    lang = request.form.get("lang", "").strip()
+    if lang == "en":
+        p.image_url_en = ""
+    elif lang == "ja":
+        p.image_url_ja = ""
+    elif lang == "ru":
+        p.image_url_ru = ""
+    else:
+        return jsonify({"ok": False, "err": "bad lang"}), 400
+    db.session.commit()
+    return jsonify({"ok": True})
 # ══ 세계관 ══════════════════════════════════════
 
 @app.route('/admin/worlds/add', methods=['POST'])
@@ -359,7 +403,7 @@ def admin_news():
     if not session.get('admin'):
         return redirect('/admin')
     items = News.query.order_by(News.order).all()
-    today = datetime.now().strftime('%Y.%m.%d')
+    today = (datetime.utcnow() + timedelta(hours=9)).strftime('%Y.%m.%d')
     return render_template('news.html', items=items, today=today)
 
 @app.route('/admin/news/add', methods=['POST'])
@@ -404,7 +448,7 @@ def admin_backup():
         'episodes': [{
             'id': e.id, 'title': e.title, 'order': e.order,
             'is_public': e.is_public, 'world_id': e.world_id, 'alias': e.alias,
-            'pages': [{'id': p.id, 'image_url': p.image_url, 'order': p.order} for p in e.pages]
+            'pages': [{'id': p.id, 'image_url': p.image_url, 'image_url_en': p.image_url_en or '', 'image_url_ja': p.image_url_ja or '', 'image_url_ru': p.image_url_ru or '', 'order': p.order} for p in e.pages]
         } for e in Episode.query.all()],
         'news': [{
             'id': n.id, 'date': n.date, 'tag': n.tag,
@@ -519,7 +563,7 @@ def admin_restore():
         db.session.commit()
         for p in e.get('pages', []):
             db.session.add(EpisodePage(id=p['id'], episode_id=e['id'],
-                                        image_url=p['image_url'], order=p.get('order', 0)))
+                                        image_url=p['image_url'], image_url_en=p.get('image_url_en', ''), image_url_ja=p.get('image_url_ja', ''), image_url_ru=p.get('image_url_ru', ''), order=p.get('order', 0)))
     db.session.commit()
 
     for n in data.get('news', []):

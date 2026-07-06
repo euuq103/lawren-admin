@@ -34,13 +34,23 @@ class Episode(db.Model):
 
 
 class EpisodePage(db.Model):
-    id         = db.Column(db.Integer, primary_key=True)
-    episode_id = db.Column(db.Integer, db.ForeignKey('episode.id'), nullable=False)
-    image_url  = db.Column(db.String(500), nullable=False)
-    order      = db.Column(db.Integer, default=0)
+    id           = db.Column(db.Integer, primary_key=True)
+    episode_id   = db.Column(db.Integer, db.ForeignKey('episode.id'), nullable=False)
+    image_url    = db.Column(db.String(500), nullable=False)          # 한국어 (기본)
+    image_url_en = db.Column(db.String(500), default='')              # 영어
+    image_url_ja = db.Column(db.String(500), default='')              # 일본어
+    image_url_ru = db.Column(db.String(500), default='')              # 러시아어
+    order        = db.Column(db.Integer, default=0)
 
     def to_dict(self):
-        return {'id': self.id, 'image_url': self.image_url, 'order': self.order}
+        return {
+            'id': self.id,
+            'image_url': self.image_url,
+            'image_url_en': self.image_url_en or '',
+            'image_url_ja': self.image_url_ja or '',
+            'image_url_ru': self.image_url_ru or '',
+            'order': self.order
+        }
 
 
 class Character(db.Model):
