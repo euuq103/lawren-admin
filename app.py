@@ -16,6 +16,12 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+    'pool_timeout': 20,
+    'max_overflow': 5,
+}
 
 # 쿠키 보안 (운영 = postgres 사용 중일 때만 SECURE 강제, 로컬 sqlite 개발은 http 허용)
 _is_prod = _db_url.startswith('postgresql://')
@@ -43,7 +49,10 @@ def _try_migrate(sql):
         pass
 
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f'[WARN] db.create_all() failed (DB may be starting up or expired): {e}')
     # 기존 DB 호환용 컬럼 마이그레이션 (이미 컬럼이 있으면 그냥 실패하고 넘어감)
     _try_migrate('ALTER TABLE character ADD COLUMN thumb_url VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE character ADD COLUMN is_public BOOLEAN DEFAULT 1')
@@ -70,54 +79,70 @@ def _client_ip():
 
 @app.route('/api/worlds')
 def api_worlds():
-    worlds = World.query.order_by(World.order).all()
-    result = []
-    for w in worlds:
-        d = w.to_dict()
-        d['characters'] = [c.to_dict() for c in
-            Character.query.filter_by(world_id=w.id).order_by(Character.order).all()]
-        result.append(d)
-    return jsonify(result)
+    try:
+        worlds = World.query.order_by(World.order).all()
+        result = []
+        for w in worlds:
+            d = w.to_dict()
+            d['characters'] = [c.to_dict() for c in
+                Character.query.filter_by(world_id=w.id).order_by(Character.order).all()]
+            result.append(d)
+        return jsonify(result)
+    except Exception as e:
+        print(f'[ERROR] /api/worlds: {e}')
+        return jsonify({'error': 'database_unavailable', 'detail': str(e)}), 503
 
 @app.route('/api/episodes')
 def api_episodes():
-    world_id   = request.args.get('world_id')
-    world_name = request.args.get('world_name')
-    q = Episode.query.filter_by(is_public=True)
-    if world_id:
-        q = q.filter_by(world_id=int(world_id))
-    elif world_name:
-        w = World.query.filter(World.name.ilike(world_name)).first()
-        if w:
-            q = q.filter_by(world_id=w.id)
-    eps = q.order_by(Episode.order).all()
-    return jsonify([e.to_dict() for e in eps])
+    try:
+        world_id   = request.args.get('world_id')
+        world_name = request.args.get('world_name')
+        q = Episode.query.filter_by(is_public=True)
+        if world_id:
+            q = q.filter_by(world_id=int(world_id))
+        elif world_name:
+            w = World.query.filter(World.name.ilike(world_name)).first()
+            if w:
+                q = q.filter_by(world_id=w.id)
+        eps = q.order_by(Episode.order).all()
+        return jsonify([e.to_dict() for e in eps])
+    except Exception as e:
+        print(f'[ERROR] /api/episodes: {e}')
+        return jsonify({'error': 'database_unavailable'}), 503
 
 @app.route('/api/characters')
 def api_characters():
-    worlds = World.query.order_by(World.order).all()
-    result = []
-    for w in worlds:
-        chars = Character.query.filter_by(world_id=w.id, is_public=True).order_by(Character.order).all()
-        result.append({
-            'world_id': w.id,
-            'world_name': w.name,
-            'characters': [{
-                'id': c.id,
-                'name': c.name,
-                'description': c.description,
-                'image_url': c.image_url,
-                'thumb_url': c.thumb_url,
-                'order': c.order,
-                'alias': c.alias or ''
-            } for c in chars]
-        })
-    return jsonify(result)
+    try:
+        worlds = World.query.order_by(World.order).all()
+        result = []
+        for w in worlds:
+            chars = Character.query.filter_by(world_id=w.id, is_public=True).order_by(Character.order).all()
+            result.append({
+                'world_id': w.id,
+                'world_name': w.name,
+                'characters': [{
+                    'id': c.id,
+                    'name': c.name,
+                    'description': c.description,
+                    'image_url': c.image_url,
+                    'thumb_url': c.thumb_url,
+                    'order': c.order,
+                    'alias': c.alias or ''
+                } for c in chars]
+            })
+        return jsonify(result)
+    except Exception as e:
+        print(f'[ERROR] /api/characters: {e}')
+        return jsonify({'error': 'database_unavailable'}), 503
 
 @app.route('/api/news')
 def api_news():
-    items = News.query.order_by(News.order).limit(3).all()
-    return jsonify([n.to_dict() for n in items])
+    try:
+        items = News.query.order_by(News.order).limit(3).all()
+        return jsonify([n.to_dict() for n in items])
+    except Exception as e:
+        print(f'[ERROR] /api/news: {e}')
+        return jsonify({'error': 'database_unavailable'}), 503
 
 # ══ 로그인 ══════════════════════════════════════
 
