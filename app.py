@@ -6,7 +6,7 @@ from io import BytesIO
 from flask import Flask, jsonify, request, render_template, redirect, session, send_file
 from flask_cors import CORS
 from sqlalchemy import text
-from models import db, World, Episode, EpisodePage, Character, News
+from models import db, World, Episode, EpisodePage, Character, News, AppMeta
 import cloudinary, cloudinary.uploader
 
 app = Flask(__name__)
@@ -61,6 +61,29 @@ with app.app_context():
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    # DB 생성일 자동 기록 (만료일 자동 계산용)
+    # AppMeta 테이블이 비어있으면 = 새 DB → 오늘 날짜 기록
+    try:
+        if AppMeta.query.count() == 0:
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            db.session.add(AppMeta(db_created=today_str))
+            db.session.commit()
+            print(f'[INFO] New DB detected — recorded creation date: {today_str}')
+    except Exception as e:
+        print(f'[WARN] AppMeta init failed (non-critical): {e}')
+
+def get_db_expire_date():
+    """DB 생성일 + 30일 = 만료일 (자동 계산)"""
+    try:
+        meta = AppMeta.query.first()
+        if meta:
+            created = datetime.strptime(meta.db_created, '%Y-%m-%d')
+            expire = created + timedelta(days=30)
+            return expire.strftime('%Y-%m-%d')
+    except Exception:
+        pass
+    # 폴백: 오늘 + 30일
+    return (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
 
 def guard():
     if not session.get('admin'):
@@ -462,7 +485,9 @@ def admin_news_delete(nid):
 def admin_backup():
     if not session.get('admin'):
         return redirect('/admin')
+    meta = AppMeta.query.first()
     data = {
+        'app_meta': {'db_created': meta.db_created} if meta else None,
         'worlds': [{'id': w.id, 'name': w.name, 'order': w.order} for w in World.query.all()],
         'characters': [{
             'id': c.id, 'name': c.name, 'description': c.description,
@@ -496,7 +521,7 @@ def admin_backup_page():
         msg = '<p style="color:#f44336">❌ 오류: JSON 파일을 확인해주세요.</p>'
     # DB 만료일: Render 무료 Postgres는 생성 후 30일 뒤 만료.
     # Render 대시보드 > DB > Info 배너에서 정확한 날짜 확인 후 아래 값만 갱신하면 됨.
-    DB_EXPIRE_DATE = "2026-07-29"
+    DB_EXPIRE_DATE = get_db_expire_date()
 
     return f'''
     <html><body style="font-family:sans-serif;padding:30px;background:#111;color:#eee">
@@ -564,7 +589,14 @@ def admin_restore():
     Character.query.delete()
     World.query.delete()
     News.query.delete()
+    AppMeta.query.delete()
     db.session.commit()
+
+    # AppMeta 복원 (있으면)
+    am = data.get('app_meta')
+    if am and am.get('db_created'):
+        db.session.add(AppMeta(db_created=am['db_created']))
+        db.session.commit()
 
     for w in data.get('worlds', []):
         db.session.add(World(id=w['id'], name=w['name'], order=w.get('order', 0)))
@@ -601,7 +633,7 @@ def admin_restore():
     # PostgreSQL auto-increment 시퀀스 복원된 id 이후로 재조정
     for tbl, seq in [('world', 'world_id_seq'), ('character', 'character_id_seq'),
                       ('episode', 'episode_id_seq'), ('episode_page', 'episode_page_id_seq'),
-                      ('news', 'news_id_seq')]:
+                      ('news', 'news_id_seq'), ('app_meta', 'app_meta_id_seq')]:
         try:
             db.session.execute(text(f"SELECT setval('{seq}', COALESCE((SELECT MAX(id) FROM {tbl}), 1))"))
         except Exception:

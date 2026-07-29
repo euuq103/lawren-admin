@@ -3,6 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 
+class AppMeta(db.Model):
+    """DB 생성일 자동 기록용 (만료일 자동 계산을 위해 사용)"""
+    id          = db.Column(db.Integer, primary_key=True)
+    db_created  = db.Column(db.String(20), nullable=False)  # YYYY-MM-DD
+
+
 class World(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(100), nullable=False)
