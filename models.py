@@ -4,9 +4,10 @@ db = SQLAlchemy()
 
 
 class AppMeta(db.Model):
-    """DB 생성일 자동 기록용 (만료일 자동 계산을 위해 사용)"""
+    """DB 생성일/만료일 기록용"""
     id          = db.Column(db.Integer, primary_key=True)
     db_created  = db.Column(db.String(20), nullable=False)  # YYYY-MM-DD
+    expire_date = db.Column(db.String(20), nullable=True)    # 사용자 직접 입력 만료일 (없으면 db_created+30일)
 
 
 class World(db.Model):
@@ -26,7 +27,7 @@ class Episode(db.Model):
     order     = db.Column(db.Integer, default=0)
     is_public = db.Column(db.Boolean, default=False)
     world_id  = db.Column(db.Integer, db.ForeignKey('world.id'), nullable=True)
-    alias     = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂月")
+    alias     = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂월")
     pages     = db.relationship('EpisodePage', backref='episode', lazy=True,
                                 cascade='all, delete-orphan', order_by='EpisodePage.order')
 
@@ -68,7 +69,7 @@ class Character(db.Model):
     world_id    = db.Column(db.Integer, db.ForeignKey('world.id'), nullable=False)
     order       = db.Column(db.Integer, default=0)
     is_public   = db.Column(db.Boolean, default=True)
-    alias       = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂月")
+    alias       = db.Column(db.String(300), default='')   # 검색용 별칭, 쉼표로 구분 (예: "사월,砂월")
 
     def to_dict(self):
         return {

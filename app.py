@@ -61,6 +61,7 @@ with app.app_context():
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE app_meta ADD COLUMN expire_date VARCHAR(20)')
     # DB 생성일 자동 기록 (만료일 자동 계산용)
     # AppMeta 테이블이 비어있으면 = 새 DB → 오늘 날짜 기록
     try:
@@ -73,10 +74,12 @@ with app.app_context():
         print(f'[WARN] AppMeta init failed (non-critical): {e}')
 
 def get_db_expire_date():
-    """DB 생성일 + 30일 = 만료일 (자동 계산)"""
+    """만료일 계산: 1) 사용자 직접 입력값 우선  2) 없으면 DB 생성일 + 30일"""
     try:
         meta = AppMeta.query.first()
         if meta:
+            if meta.expire_date:
+                return meta.expire_date
             created = datetime.strptime(meta.db_created, '%Y-%m-%d')
             expire = created + timedelta(days=30)
             return expire.strftime('%Y-%m-%d')
@@ -487,7 +490,7 @@ def admin_backup():
         return redirect('/admin')
     meta = AppMeta.query.first()
     data = {
-        'app_meta': {'db_created': meta.db_created} if meta else None,
+        'app_meta': {'db_created': meta.db_created, 'expire_date': meta.expire_date} if meta else None,
         'worlds': [{'id': w.id, 'name': w.name, 'order': w.order} for w in World.query.all()],
         'characters': [{
             'id': c.id, 'name': c.name, 'description': c.description,
@@ -519,15 +522,22 @@ def admin_backup_page():
         msg = '<p style="color:#4caf50">✅ 복원 완료!</p>'
     elif request.args.get('error'):
         msg = '<p style="color:#f44336">❌ 오류: JSON 파일을 확인해주세요.</p>'
-    # DB 만료일: Render 무료 Postgres는 생성 후 30일 뒤 만료.
-    # Render 대시보드 > DB > Info 배너에서 정확한 날짜 확인 후 아래 값만 갱신하면 됨.
+    # DB 만료일: 사용자 입력값 우선, 없으면 자동 계산 (생성일 + 30일)
     DB_EXPIRE_DATE = get_db_expire_date()
+    expire_saved = request.args.get('expire_saved')
 
     return f'''
     <html><body style="font-family:sans-serif;padding:30px;background:#111;color:#eee">
       <h2>백업 / 복원</h2>
       {msg}
-      <div id="expireBox" style="padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:15px;"></div>
+      {'<p style="color:#4caf50">✅ 만료일이 갱신되었습니다.</p>' if expire_saved else ''}
+      <div id="expireBox" style="padding:12px 16px;border-radius:6px;margin-bottom:12px;font-size:15px;"></div>
+      <form method="POST" action="/admin/set-expire" style="margin-bottom:20px;display:flex;gap:8px;align-items:center;">
+        <span style="color:#888;font-size:13px">만료일 직접 설정:</span>
+        <input type="date" name="expire_date" value="{DB_EXPIRE_DATE}"
+               style="background:#222;color:#eee;border:1px solid #444;border-radius:4px;padding:4px 8px;">
+        <button type="submit" style="background:#2196f3;color:#fff;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">저장</button>
+      </form>
       <p><a href="/admin/backup" style="color:#4caf50;font-size:18px">📥 지금 백업 다운로드</a></p>
       <hr style="border-color:#333">
       <form method="POST" action="/admin/restore" enctype="multipart/form-data"
@@ -592,11 +602,11 @@ def admin_restore():
     AppMeta.query.delete()
     db.session.commit()
 
-    # AppMeta 복원 (있으면)
-    am = data.get('app_meta')
-    if am and am.get('db_created'):
-        db.session.add(AppMeta(db_created=am['db_created']))
-        db.session.commit()
+    # AppMeta는 백업 파일 대신 오늘 날짜로 리셋
+    # (복원 = 보통 새 DB에 하는 작업이므로 예전 생성일을 가져오면 만료일이 틀어짐)
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    db.session.add(AppMeta(db_created=today_str, expire_date=None))
+    db.session.commit()
 
     for w in data.get('worlds', []):
         db.session.add(World(id=w['id'], name=w['name'], order=w.get('order', 0)))
@@ -641,6 +651,28 @@ def admin_restore():
     db.session.commit()
 
     return redirect('/admin/backup-page?success=1')
+
+
+@app.route('/admin/set-expire', methods=['POST'])
+def admin_set_expire():
+    if not session.get('admin'):
+        return redirect('/admin')
+    raw = (request.form.get('expire_date') or '').strip()
+    # YYYY-MM-DD 형식 검증
+    try:
+        parsed = datetime.strptime(raw, '%Y-%m-%d')
+        raw = parsed.strftime('%Y-%m-%d')
+    except ValueError:
+        return redirect('/admin/backup-page?error=1')
+    try:
+        AppMeta.query.delete()
+        db.session.add(AppMeta(db_created=datetime.now().strftime('%Y-%m-%d'),
+                               expire_date=raw))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return redirect('/admin/backup-page?error=1')
+    return redirect('/admin/backup-page?expire_saved=1')
 
 
 if __name__ == '__main__':
