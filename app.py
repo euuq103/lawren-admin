@@ -14,6 +14,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'lawren103secret')
 _db_url = os.environ.get('DATABASE_URL', 'sqlite:///lawren.db')
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+# SQLAlchemy 신버전은 postgresql:// 를 psycopg(v3) 드라이버로 해석하지만
+# 우리 앱은 psycopg2 를 쓰므로 접속 방식을 명시적으로 고정 (없으면 배포 시 ModuleNotFoundError 발생)
+if _db_url.startswith('postgresql://') and not _db_url.startswith('postgresql+'):
+    _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
