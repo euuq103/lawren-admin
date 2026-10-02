@@ -3,136 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>세계관 관리 — LAWREN103 Admin</title>
+<title>Worlds — LAWREN103 Admin</title>
 <style>
-  :root { --bg:#020202; --text:#5ef2ff; --muted:#7aa9b0; --accent:#2fd3e0; --line:#17353a; }
+  :root { --bg:#020202; --surface:#0b0b0b; --border:#1e3a3f; --cyan:#2fd3e0; --cdim:#17353a; --text:#c8e8ec; --muted:#4a7a82; --red:#ff4e4e; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text);
-         min-height:100vh; padding:36px 18px 80px; overflow-x:hidden; }
-  .wrap { max-width:760px; margin:0 auto; }
-  h1 { font-size:1rem; letter-spacing:.22em; color:var(--accent); text-transform:uppercase; margin-bottom:4px; }
-  p.sub { font-size:.74rem; color:var(--muted); line-height:1.7; margin-bottom:24px; }
-  /* 어드민 패밀리 탭 네비 (characters/episodes와 동일 스타일) */
-  nav.adm { display:flex; align-items:center; padding:14px 24px; border-bottom:1px solid var(--line); margin:-36px -18px 30px; }
+  body { background:var(--bg); color:var(--text); font-family:'Courier New',monospace; }
+
+  nav { display:flex; align-items:center; padding:14px 32px; border-bottom:1px solid var(--border); }
   .tabs { display:flex; gap:2px; flex:1; }
-  .tabs a { padding:6px 20px; color:var(--muted); text-decoration:none; font-size:.8rem; letter-spacing:.12em; border-bottom:2px solid transparent; transition:color .15s; font-family:'Courier New',monospace; }
+  .tabs a { padding:6px 20px; color:var(--muted); text-decoration:none; font-size:0.8rem; letter-spacing:0.12em; border-bottom:2px solid transparent; transition:color .15s; }
   .tabs a:hover { color:var(--text); }
-  .tabs a.on { color:var(--accent); border-bottom-color:var(--accent); }
-  .logout { color:#ff4e4e; text-decoration:none; font-size:.75rem; opacity:.55; transition:opacity .15s; }
+  .tabs a.on { color:var(--cyan); border-bottom-color:var(--cyan); }
+  .logout { color:var(--red); text-decoration:none; font-size:0.75rem; opacity:.55; transition:opacity .15s; }
   .logout:hover { opacity:1; }
 
-  /* 추가 폼 */
-  .addbox { display:flex; gap:8px; margin-bottom:26px; flex-wrap:wrap; }
-  .addbox input[type=text] { flex:1; min-width:200px; }
-  input, button, select { font-family:inherit; }
-  input[type=text], input[type=number] { background:#060d0e; border:1px solid var(--line);
-    color:var(--text); padding:8px 10px; font-size:.8rem; }
-  input[type=text]:focus, input[type=number]:focus { outline:none; border-color:var(--accent); }
-  button { cursor:pointer; border:1px solid var(--line); background:rgba(94,242,255,.04);
-    color:var(--text); padding:8px 14px; font-size:.78rem; transition:border-color .2s, box-shadow .2s; }
-  button:hover { border-color:var(--accent); box-shadow:0 0 8px rgba(47,211,224,.2); }
-  button.danger { color:#ff8a7e; }
-  button.danger:hover { border-color:#ff8a7e; box-shadow:0 0 8px rgba(255,122,110,.25); }
+  .page { max-width:900px; margin:0 auto; padding:36px 28px; }
+  .label { font-size:0.65rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+
+  .add-card { background:var(--surface); border:1px solid var(--border); padding:18px 22px; margin-bottom:30px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .inp { background:transparent; border:none; border-bottom:1px solid var(--border); color:var(--text); padding:6px 2px; font-size:0.87rem; font-family:inherit; outline:none; transition:border-color .15s; }
+  .inp:focus { border-bottom-color:var(--cyan); }
+  input[type=number].inp { width:90px; }
+  .btn { background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:6px 16px; cursor:pointer; font-size:0.78rem; letter-spacing:0.1em; font-family:inherit; transition:background .15s; }
+  .btn:hover { background:rgba(47,211,224,.07); }
+  .btn.red { border-color:var(--red); color:var(--red); }
+  .btn.red:hover { background:rgba(255,78,78,.07); }
 
   /* 월드 카드 */
-  .card { border:1px solid var(--line); background:rgba(94,242,255,.02); padding:16px;
-          margin-bottom:18px; display:flex; gap:16px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--border); padding:18px 22px; margin-bottom:26px; }
+  .card .inner { display:flex; gap:22px; flex-wrap:wrap; }
   .cover-col { flex:0 0 120px; }
-  .cover-box { width:120px; aspect-ratio:2/3; border:1px solid var(--line); overflow:hidden;
+  .cover-box { width:120px; aspect-ratio:2/3; border:1px solid var(--border); overflow:hidden;
                display:flex; align-items:center; justify-content:center; font-size:.7rem;
-               color:var(--muted); background:#060d0e; }
+               color:var(--muted); background:#050505; }
   .cover-box img { width:100%; height:100%; object-fit:cover; display:block; }
   .cover-btns { display:flex; gap:6px; margin-top:8px; }
-  .cover-btns button { flex:1; padding:6px 4px; font-size:.7rem; }
+  .cover-btns .btn { flex:1; padding:5px 4px; font-size:.68rem; letter-spacing:.04em; }
 
-  .fields { flex:1; min-width:260px; display:grid; grid-template-columns:90px 1fr; gap:10px 10px; align-items:center; }
+  .fields { flex:1; min-width:260px; display:grid; grid-template-columns:90px 1fr; gap:12px 10px; align-items:center; }
   .fields label { font-size:.72rem; color:var(--muted); }
-  .theme-row { display:flex; gap:8px; align-items:center; }
-  input[type=color] { width:34px; height:28px; padding:0; border:1px solid var(--line);
-                      background:#060d0e; cursor:pointer; }
+  .theme-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  input[type=color] { width:34px; height:26px; padding:0; border:1px solid var(--border);
+                      background:#050505; cursor:pointer; }
   .hex { font-size:.7rem; color:var(--muted); }
 
-  .actions { width:100%; display:flex; justify-content:flex-end; gap:8px; margin-top:6px;
-             border-top:1px dashed var(--line); padding-top:12px; }
+  .actions { width:100%; display:flex; justify-content:flex-end; gap:8px; margin-top:14px;
+             border-top:1px solid #0d0d0d; padding-top:14px; }
 
-  .tip { font-size:.7rem; color:var(--muted); line-height:1.8; border:1px dashed var(--line);
-         padding:12px 14px; margin-top:30px; }
-  .tip b { color:var(--text); }
-  .msg-ok  { color:#7ef2b0; }
-  .msg-err { color:#ff8a7e; }
+  .tip { font-size:0.72rem; color:var(--muted); line-height:1.9; border:1px dashed var(--border);
+         padding:14px 16px; margin-top:34px; }
+  .tip b { color:var(--text); font-weight:normal; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Worlds — 세계관 관리</h1>
-  <p class="sub">이름 · 별칭 · 표지 · 테마 색을 한 화면에서 관리합니다.</p>
-  <nav class="adm">
-    <div class="tabs">
-      <a href="/admin/episodes">Episodes</a>
-      <a href="/admin/characters">Characters</a>
-      <a href="/admin/worlds" class="on">Worlds</a>
-      <a href="/admin/backup-page">Backup</a>
-      <a href="/admin/news">News</a>
-    </div>
-    <a href="/admin/logout" class="logout">logout</a>
-  </nav>
+<nav>
+  <div class="tabs">
+    <a href="/admin/episodes">Episodes</a>
+    <a href="/admin/characters">Characters</a>
+    <a href="/admin/worlds" class="on">Worlds</a>
+    <a href="/admin/backup-page">Backup</a>
+    <a href="/admin/news">News</a>
+  </div>
+  <a href="/admin/logout" class="logout">logout</a>
+</nav>
+
+<div class="page">
 
   <!-- 세계관 추가 -->
-  <form class="addbox" method="post" action="/admin/worlds/add">
-    <input type="text" name="name" placeholder="새 세계관 이름" required>
-    <button type="submit">+ 세계관 추가</button>
-  </form>
+  <div class="add-card">
+    <p class="label">새 세계관</p>
+    <form method="post" action="/admin/worlds/add">
+      <div class="row">
+        <input type="text" name="name" class="inp" placeholder="이름" required style="flex:1; min-width:200px">
+        <button type="submit" class="btn">+ 추가</button>
+      </div>
+    </form>
+  </div>
 
   {% for w in worlds %}
   <form class="card" method="post" action="/admin/worlds/edit/{{ w.id }}">
     <input type="hidden" name="cover_url" id="cover_{{ w.id }}" value="{{ w.cover_url or '' }}">
 
-    <div class="cover-col">
-      <div class="cover-box" id="coverbox_{{ w.id }}">
-        {% if w.cover_url %}<img src="{{ w.cover_url }}" alt="표지">{% else %}표지 없음{% endif %}
+    <div class="inner">
+      <div class="cover-col">
+        <div class="cover-box" id="coverbox_{{ w.id }}">
+          {% if w.cover_url %}<img src="{{ w.cover_url }}" alt="표지">{% else %}표지 없음{% endif %}
+        </div>
+        <div class="cover-btns">
+          <button type="button" class="btn" onclick="document.getElementById('file_{{ w.id }}').click()">업로드</button>
+          <button type="button" class="btn red" onclick="clearCover({{ w.id }})">삭제</button>
+        </div>
+        <input type="file" id="file_{{ w.id }}" accept="image/*" style="display:none" onchange="uploadCover({{ w.id }}, this)">
       </div>
-      <div class="cover-btns">
-        <button type="button" onclick="document.getElementById('file_{{ w.id }}').click()">표지 업로드</button>
-        <button type="button" class="danger" onclick="clearCover({{ w.id }})">삭제</button>
-      </div>
-      <input type="file" id="file_{{ w.id }}" accept="image/*" style="display:none" onchange="uploadCover({{ w.id }}, this)">
-    </div>
 
-    <div class="fields">
-      <label>이름</label>
-      <input type="text" name="name" value="{{ w.name }}" required>
-      <label>별칭</label>
-      <input type="text" name="alias" value="{{ w.alias or '' }}" placeholder="쉼표로 구분, 이름 변경 시 옛 이름 자동 추가">
-      <label>테마 색</label>
-      <div class="theme-row">
-        <input type="color" id="pick_{{ w.id }}" value="{{ w.theme_color or '#2fd3e0' }}"
-               oninput="document.getElementById('hexval_{{ w.id }}').textContent=this.value">
-        <span class="hex" id="hexval_{{ w.id }}">{{ w.theme_color or '(기본: 세계관 기존 테마)' }}</span>
-        <button type="button" onclick="resetTheme({{ w.id }})">기본 테마</button>
+      <div class="fields">
+        <label>이름</label>
+        <input type="text" name="name" class="inp" value="{{ w.name }}" required>
+        <label>별칭</label>
+        <input type="text" name="alias" class="inp" value="{{ w.alias or '' }}" placeholder="쉼표 구분, 이름 변경 시 옛 이름 자동 추가">
+        <label>테마 색</label>
+        <div class="theme-row">
+          <input type="color" id="pick_{{ w.id }}" value="{{ w.theme_color or '#2fd3e0' }}"
+                 oninput="document.getElementById('hexval_{{ w.id }}').textContent=this.value">
+          <span class="hex" id="hexval_{{ w.id }}">{{ w.theme_color or '(기본: 세계관 기존 테마)' }}</span>
+          <button type="button" class="btn" onclick="resetTheme({{ w.id }})">기본</button>
+        </div>
+        <input type="hidden" name="theme_color" id="theme_{{ w.id }}" value="{{ w.theme_color or '' }}">
+        <label>순서</label>
+        <input type="number" name="order" class="inp" value="{{ w.order }}" min="0">
       </div>
-      <input type="hidden" name="theme_color" id="theme_{{ w.id }}" value="{{ w.theme_color or '' }}">
-      <label>순서</label>
-      <input type="number" name="order" value="{{ w.order }}" min="0" style="width:90px">
     </div>
 
     <div class="actions">
-      <button type="button" class="danger"
+      <button type="button" class="btn red"
               onclick="if(confirm('{{ w.name }} 세계관을 삭제할까요? (속한 캐릭터도 함께 삭제됩니다)')) window.location='/admin/worlds/delete/{{ w.id }}'">세계관 삭제</button>
-      <button type="submit">저장</button>
+      <button type="submit" class="btn">저장</button>
     </div>
   </form>
   {% endfor %}
 
   {% if not worlds %}
-  <p class="sub">세계관이 없습니다. 위에서 추가해보세요.</p>
+  <p style="font-size:.8rem; color:var(--muted)">세계관이 없습니다. 위에서 추가해보세요.</p>
   {% endif %}
 
   <div class="tip">
     <b>사용 안내</b><br>
-    &bull; <b>표지</b>: 메인 페이지 Comics 드롭다운에 2:3 비율(웹툰 표지) 카드로 표시됩니다. 표지가 없으면 기존 텍스트 버튼으로 표시됩니다.<br>
+    &bull; <b>표지</b>: 메인 페이지 Comics 드롭다운에 2:3 비율(웹툰 표지) 카드로 표시됩니다. 표지가 없으면 텍스트 버튼으로 표시됩니다.<br>
     &bull; <b>이름 변경</b>: 옛 이름은 자동으로 별칭에 저장되어 기존 링크(?world=옛이름)가 계속 작동합니다.<br>
-    &bull; <b>테마 색</b>: 캐릭터 페이지의 세계관 테마(포인트색+파티클)에 적용됩니다. 비워두면 기존 기본 테마(정해진 4색)를 사용합니다.<br>
-    &bull; 표지 업로드는 저장 버튼과 별개로 진행되며, 업로드 후 반드시 <b>저장</b>을 눌러야 반영됩니다.
+    &bull; <b>테마 색</b>: 캐릭터 페이지의 세계관 테마(포인트색+파티클)에 적용됩니다. 비워두면 기존 기본 테마를 사용합니다.<br>
+    &bull; 표지 업로드는 저장 버튼과 별개이며, 업로드 후 반드시 <b>저장</b>을 눌러야 반영됩니다.
   </div>
 </div>
 

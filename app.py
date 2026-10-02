@@ -111,6 +111,40 @@ def _client_ip():
 
 # ══ 공개 API ════════════════════════════════════
 
+# ══ 공유 카드 대표 표지 (og:image 자동화) ═════════════════════
+OG_FALLBACK_URL = 'https://res.cloudinary.com/dmn9mxxqq/image/upload/v1790926259/lawren103/lnkvrbmcxl8mlopjtybe.jpg'
+_og_cache = {'url': '', 'data': b'', 'type': 'image/jpeg'}
+
+@app.route('/api/og-image')
+def api_og_image():
+    """공유 썸네일: 순서상 가장 앞선 표지 보유 세계관의 표지를 그대로 전송.
+    어드민에서 표지를 바꾸면 이 주소의 내용이 자동으로 따라감.
+    DB/네트워크 실패 시 마지막 성공 이미지 또는 폴백 URL로 응답해 카드가 깨지지 않게 함."""
+    cover = ''
+    try:
+        w = World.query.filter(World.cover_url != '').order_by(World.order).first()
+        cover = (w.cover_url or '').strip() if w else ''
+    except Exception as e:
+        print(f'[WARN] /api/og-image db: {e}')
+    if not cover:
+        cover = _og_cache.get('url') or OG_FALLBACK_URL
+    try:
+        if cover == _og_cache.get('url') and _og_cache.get('data'):
+            resp = send_file(BytesIO(_og_cache['data']), mimetype=_og_cache['type'])
+        else:
+            import urllib.request
+            req = urllib.request.Request(cover, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=8) as f:
+                data = f.read()
+            ctype = 'image/' + (f.headers.get_content_subtype() or 'jpeg')
+            _og_cache.update({'url': cover, 'data': data, 'type': ctype})
+            resp = send_file(BytesIO(data), mimetype=ctype)
+        resp.headers['Cache-Control'] = 'public, max-age=3600'
+        return resp
+    except Exception as e:
+        print(f'[WARN] /api/og-image fetch: {e}')
+        return redirect(OG_FALLBACK_URL)
+
 @app.route('/api/worlds')
 def api_worlds():
     try:
@@ -427,7 +461,7 @@ def world_edit(id):
         print(f'[ERROR] world_edit: {e}')
     return redirect('/admin/worlds')
 
-@app.route('/admin/worlds/delete/<int:id>', methods=['GET','POST'])
+@app.route('/admin/worlds/delete/<int:id>', methods=['POST'])
 def world_delete(id):
     r = guard()
     if r: return r
