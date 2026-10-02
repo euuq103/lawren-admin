@@ -70,6 +70,12 @@
 
 <div class="page">
 
+  {% if request.args.get('deleted') %}
+  <p style="color:#4caf50;font-size:.8rem;margin-bottom:18px">✅ 세계관을 삭제했습니다. (캐릭터·에피소드도 함께 삭제됨)</p>
+  {% elif request.args.get('del_err') %}
+  <p style="color:var(--red);font-size:.8rem;margin-bottom:18px">⚠ 삭제 중 오류가 발생했습니다. 다시 시도해주세요.</p>
+  {% endif %}
+
   <!-- 세계관 추가 -->
   <div class="add-card">
     <p class="label">새 세계관</p>

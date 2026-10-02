@@ -115,6 +115,64 @@ def _client_ip():
 OG_FALLBACK_URL = 'https://res.cloudinary.com/dmn9mxxqq/image/upload/v1790926259/lawren103/lnkvrbmcxl8mlopjtybe.jpg'
 _og_cache = {'url': '', 'data': b'', 'type': 'image/jpeg'}
 
+
+# ══ 공유 카드: 회차별 og 태그 + 만화 페이지 자동 이동 ══════════════
+@app.route('/share')
+def share_card():
+    """공유용 URL - 메신저 크롤러는 회차별 og 태그를 읽고,
+       사람이 열면 만화 뷰어(Asa.HTML)로 자동 리다이렉트."""
+    import html as _html, urllib.parse as _up
+    world_name = request.args.get('world', '')
+    ep_no      = request.args.get('ep', default=0, type=int)
+    title  = 'LAWREN103 — comic'
+    image  = 'https://res.cloudinary.com/dmn9mxxqq/image/upload/v1790926259/lawren103/lnkvrbmcxl8mlopjtybe.jpg'  # 폴백: 砂월 표지
+    try:
+        w = None
+        if world_name:
+            w = World.query.filter(World.name.ilike(world_name)).first()
+            if not w:
+                w = World.query.filter(World.alias.ilike(world_name)).first()
+        if w:
+            if w.cover_url:
+                image = w.cover_url
+            eps = Episode.query.filter_by(world_id=w.id, is_public=True).order_by(Episode.order).all()
+            if eps and 1 <= ep_no <= len(eps):
+                e = eps[ep_no - 1]
+                title = f"{w.name} — {e.title}"
+                if not w.cover_url and e.pages:   # 세계관 표지 없으면 그 화 첫 컷
+                    image = e.pages[0].image_url
+            elif eps:
+                title = f"{w.name} — comic"
+    except Exception as e:
+        print(f'[ERROR] /share: {e}')
+
+    params = {'ep': ep_no}
+    if world_name:
+        params['world'] = world_name
+    viewer = 'https://lawren103.com/comic/Asa.HTML?' + _up.urlencode(params)
+
+    t   = _html.escape(title)
+    img = _html.escape(image)
+    vu  = _html.escape(viewer)
+    return f'''<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<title>{t}</title>
+<meta property="og:title" content="{t}" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="{vu}" />
+<meta property="og:image" content="{img}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{t}" />
+<meta name="twitter:image" content="{img}" />
+<link rel="canonical" href="{vu}" />
+<meta http-equiv="refresh" content="0;url={vu}" />
+</head>
+<body style="background:#020202;color:#5ef2ff;font-family:'Courier New',monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+<p style="font-size:.85rem;letter-spacing:.08em">만화 페이지로 이동 중..
+<a href="{vu}" style="color:#2fd3e0">이동이 안 되면 여기를 눌러주세요</a></p>
+</body></html>''', 200, {'Cache-Control': 'public, max-age=600'}
+
 @app.route('/api/og-image')
 def api_og_image():
     """공유 썸네일: 순서상 가장 앞선 표지 보유 세계관의 표지를 그대로 전송.
@@ -461,19 +519,25 @@ def world_edit(id):
         print(f'[ERROR] world_edit: {e}')
     return redirect('/admin/worlds')
 
-@app.route('/admin/worlds/delete/<int:id>', methods=['POST'])
+@app.route('/admin/worlds/delete/<int:id>', methods=['GET', 'POST'])
 def world_delete(id):
     r = guard()
     if r: return r
     try:
         w = World.query.get(id)
         if w:
-            db.session.delete(w)
+            # 에피소드는 FK가 world_id를 가리켜 ORM cascade가 없음 → 명시 삭제
+            # (bulk delete는 페이지 cascade가 안 돌므로 객체 단위로 삭제)
+            for e in Episode.query.filter_by(world_id=w.id).all():
+                db.session.delete(e)   # 페이지는 cascade로 함께 삭제됨
+            db.session.delete(w)       # 캐릭터는 cascade로 함께 삭제됨
             db.session.commit()
+            return redirect('/admin/worlds?deleted=1')
     except Exception as e:
         db.session.rollback()
         print(f'[ERROR] world_delete: {e}')
-    return redirect(request.referrer or '/admin/characters')
+        return redirect('/admin/worlds?del_err=1')
+    return redirect('/admin/worlds')
 
 # ══ 캐릭터 ══════════════════════════════════════
 
@@ -680,11 +744,32 @@ def admin_restore():
 
     # 안전장치: 백업 파일 구조가 맞는지 확인 후에만 기존 데이터 삭제 진행
     # (엉뚱한 JSON을 올려도 DB가 통째로 날아가지 않도록 방지)
+    def _rows_ok(rows, required):
+        return all(isinstance(r, dict) and all(k in r for k in required) for r in rows)
     if not isinstance(data, dict) or not any(
         isinstance(data.get(k), list) for k in ('worlds', 'characters', 'episodes', 'news')
     ):
         return redirect('/admin/backup-page?error=1')
+    # 각 행의 필수 키까지 사전 검증 (필수 키가 빠진 행이 하나라도 있으면 복원 중단)
+    _REQ = {
+        'worlds':     ('id', 'name'),
+        'characters': ('id', 'name', 'world_id'),
+        'episodes':   ('id', 'title'),
+        'news':       ('id', 'date', 'text'),
+    }
+    for k, req in _REQ.items():
+        if not _rows_ok(data.get(k, []), req):
+            return redirect('/admin/backup-page?error=1')
 
+    try:
+        _do_restore(data)
+    except Exception as e:
+        db.session.rollback()
+        print(f'[ERROR] restore: {e}')
+        return redirect('/admin/backup-page?error=1')
+    return redirect('/admin/backup-page?success=1')
+
+def _do_restore(data):
     # 기존 데이터 전체 삭제 (자식 테이블부터)
     EpisodePage.query.delete()
     Episode.query.delete()
@@ -745,8 +830,6 @@ def admin_restore():
         except Exception:
             pass
     db.session.commit()
-
-    return redirect('/admin/backup-page?success=1')
 
 
 @app.route('/admin/set-expire', methods=['POST'])
