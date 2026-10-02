@@ -427,7 +427,7 @@ def world_edit(id):
         print(f'[ERROR] world_edit: {e}')
     return redirect('/admin/worlds')
 
-@app.route('/admin/worlds/delete/<int:id>', methods=['POST'])
+@app.route('/admin/worlds/delete/<int:id>', methods=['GET','POST'])
 def world_delete(id):
     r = guard()
     if r: return r

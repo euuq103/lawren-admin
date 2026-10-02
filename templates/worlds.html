@@ -8,13 +8,18 @@
   :root { --bg:#020202; --text:#5ef2ff; --muted:#7aa9b0; --accent:#2fd3e0; --line:#17353a; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text);
-         min-height:100vh; padding:36px 18px 80px; }
+         min-height:100vh; padding:36px 18px 80px; overflow-x:hidden; }
   .wrap { max-width:760px; margin:0 auto; }
   h1 { font-size:1rem; letter-spacing:.22em; color:var(--accent); text-transform:uppercase; margin-bottom:4px; }
   p.sub { font-size:.74rem; color:var(--muted); line-height:1.7; margin-bottom:24px; }
-  .nav { font-size:.74rem; margin-bottom:26px; }
-  .nav a { color:var(--muted); text-decoration:none; border:1px solid var(--line); padding:6px 12px; display:inline-block; }
-  .nav a:hover { color:var(--text); border-color:var(--accent); }
+  /* 어드민 패밀리 탭 네비 (characters/episodes와 동일 스타일) */
+  nav.adm { display:flex; align-items:center; padding:14px 24px; border-bottom:1px solid var(--line); margin:-36px -18px 30px; }
+  .tabs { display:flex; gap:2px; flex:1; }
+  .tabs a { padding:6px 20px; color:var(--muted); text-decoration:none; font-size:.8rem; letter-spacing:.12em; border-bottom:2px solid transparent; transition:color .15s; font-family:'Courier New',monospace; }
+  .tabs a:hover { color:var(--text); }
+  .tabs a.on { color:var(--accent); border-bottom-color:var(--accent); }
+  .logout { color:#ff4e4e; text-decoration:none; font-size:.75rem; opacity:.55; transition:opacity .15s; }
+  .logout:hover { opacity:1; }
 
   /* 추가 폼 */
   .addbox { display:flex; gap:8px; margin-bottom:26px; flex-wrap:wrap; }
@@ -61,7 +66,16 @@
 <div class="wrap">
   <h1>Worlds — 세계관 관리</h1>
   <p class="sub">이름 · 별칭 · 표지 · 테마 색을 한 화면에서 관리합니다.</p>
-  <div class="nav"><a href="/admin/characters">&larr; 캐릭터 관리로</a> <a href="/admin/episodes">에피소드 관리</a></div>
+  <nav class="adm">
+    <div class="tabs">
+      <a href="/admin/episodes">Episodes</a>
+      <a href="/admin/characters">Characters</a>
+      <a href="/admin/worlds" class="on">Worlds</a>
+      <a href="/admin/backup-page">Backup</a>
+      <a href="/admin/news">News</a>
+    </div>
+    <a href="/admin/logout" class="logout">logout</a>
+  </nav>
 
   <!-- 세계관 추가 -->
   <form class="addbox" method="post" action="/admin/worlds/add">

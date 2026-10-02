@@ -68,9 +68,6 @@
     .ecancel:hover { color:var(--text); }
     .empty { color:#253a3a; }
 
-    .world-hd { cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
-    .arr { font-size:0.65rem; color:var(--cdim); }
-
     /* 필터바 */
     .filter-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
     .filter-bar select, .filter-bar input { background:transparent; border:1px solid var(--border); color:var(--text); padding:5px 10px; font-size:0.8rem; font-family:inherit; outline:none; transition:border-color .15s; }
@@ -87,6 +84,7 @@
   <div class="tabs">
     <a href="/admin/episodes">Episodes</a>
     <a href="/admin/characters" class="on">Characters</a>
+    <a href="/admin/worlds">Worlds</a>
     <a href="/admin/backup-page">Backup</a>
     <a href="/admin/news">News</a>
   </div>
@@ -238,41 +236,6 @@
     </table>
   </div>
 
-  <!-- 세계관 관리 (접힘) -->
-  <div class="section">
-    <p class="label world-hd" onclick="togW()">
-      세계관 관리 <span class="arr" id="warr">▶</span>
-    </p>
-    <div id="wPanel" style="display:none; margin-top:14px">
-      <div class="add-card">
-        <form method="POST" action="/admin/worlds/add">
-          <div class="row">
-            <input class="inp" type="text" name="name" placeholder="세계관 이름" required style="width:190px">
-            <button class="btn" type="submit">+ 추가</button>
-          </div>
-        </form>
-      </div>
-      <table>
-        <thead><tr><th>ID</th><th>이름</th><th></th></tr></thead>
-        <tbody>
-        {% if worlds %}
-          {% for w in worlds %}
-          <tr>
-            <td class="tag">{{ w.id }}</td>
-            <td>{{ w.name }}</td>
-            <td><form method="POST" action="/admin/worlds/delete/{{ w.id }}" style="display:inline" onsubmit="return confirm('삭제?')">
-              <button class="ic del" type="submit">삭제</button></form>
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr><td colspan="3" class="empty">없음</td></tr>
-        {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
 </div>
 
 <script>
@@ -313,13 +276,6 @@ function uploadFile(input, urlInputId, previewId, loadingId) {
 function togC(id) {
   var r = document.getElementById('c'+id);
   r.style.display = r.style.display === 'table-row' ? 'none' : 'table-row';
-}
-function togW() {
-  var p = document.getElementById('wPanel');
-  var a = document.getElementById('warr');
-  var open = p.style.display !== 'none';
-  p.style.display = open ? 'none' : 'block';
-  a.textContent   = open ? '▶' : '▼';
 }
 
 function filterRows() {
