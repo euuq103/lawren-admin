@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request, render_template, redirect, session, s
 from flask_cors import CORS
 from sqlalchemy import text
 from models import db, World, Episode, EpisodePage, Character, News, AppMeta
+import re
 import cloudinary, cloudinary.uploader
 
 app = Flask(__name__)
@@ -65,6 +66,9 @@ with app.app_context():
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ja VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode_page ADD COLUMN image_url_ru VARCHAR(500) DEFAULT \'\'')
     _try_migrate('ALTER TABLE episode ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE world ADD COLUMN cover_url VARCHAR(500) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE world ADD COLUMN alias VARCHAR(300) DEFAULT \'\'')
+    _try_migrate('ALTER TABLE world ADD COLUMN theme_color VARCHAR(20) DEFAULT \'\'')
     _try_migrate('ALTER TABLE app_meta ADD COLUMN expire_date VARCHAR(20)')
     # DB 생성일 자동 기록 (만료일 자동 계산용)
     # AppMeta 테이블이 비어있으면 = 새 DB → 오늘 날짜 기록
@@ -132,6 +136,8 @@ def api_episodes():
             q = q.filter_by(world_id=int(world_id))
         elif world_name:
             w = World.query.filter(World.name.ilike(world_name)).first()
+            if not w:
+                w = World.query.filter(World.alias.ilike(world_name)).first()
             if w:
                 q = q.filter_by(world_id=w.id)
         eps = q.order_by(Episode.order).all()
@@ -150,6 +156,8 @@ def api_characters():
             result.append({
                 'world_id': w.id,
                 'world_name': w.name,
+                'world_alias': w.alias or '',
+                'theme_color': w.theme_color or '',
                 'characters': [{
                     'id': c.id,
                     'name': c.name,
@@ -381,15 +389,57 @@ def world_add():
         db.session.commit()
     return redirect(request.referrer or '/admin/characters')
 
+@app.route('/admin/worlds')
+def admin_worlds():
+    r = guard()
+    if r: return r
+    try:
+        worlds = World.query.order_by(World.order).all()
+    except Exception as e:
+        print(f'[ERROR] admin_worlds: {e}')
+        worlds = []
+    return render_template('worlds.html', worlds=worlds)
+
+@app.route('/admin/worlds/edit/<int:id>', methods=['POST'])
+def world_edit(id):
+    r = guard()
+    if r: return r
+    try:
+        w = World.query.get(id)
+        if w:
+            new_name = request.form.get('name', w.name).strip()
+            alias    = request.form.get('alias', w.alias or '').strip()
+            # 이름이 바뀌면 옛 이름을 별칭에 자동 추가 → 기존 ?world=옛이름 링크 유지
+            if new_name and new_name != w.name:
+                olds = [a.strip() for a in alias.split(',') if a.strip()]
+                if w.name not in olds:
+                    olds.insert(0, w.name)
+                alias = ','.join(olds)
+            w.name        = new_name or w.name
+            w.alias       = alias
+            tc = (request.form.get('theme_color') or '').strip()
+            w.theme_color = tc if re.fullmatch(r'#[0-9a-fA-F]{3,6}', tc) else ''
+            w.order       = int(request.form.get('order') or w.order)
+            w.cover_url   = (request.form.get('cover_url') or '').strip()
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f'[ERROR] world_edit: {e}')
+    return redirect('/admin/worlds')
+
 @app.route('/admin/worlds/delete/<int:id>', methods=['POST'])
 def world_delete(id):
     r = guard()
     if r: return r
-    w = World.query.get(id)
-    if w:
-        db.session.delete(w)
-        db.session.commit()
-    return redirect('/admin/characters')
+    try:
+        w = World.query.get(id)
+        if w:
+            db.session.delete(w)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f'[ERROR] world_delete: {e}')
+    return redirect(request.referrer or '/admin/characters')
 
 # ══ 캐릭터 ══════════════════════════════════════
 
@@ -495,7 +545,11 @@ def admin_backup():
     meta = AppMeta.query.first()
     data = {
         'app_meta': {'db_created': meta.db_created, 'expire_date': meta.expire_date} if meta else None,
-        'worlds': [{'id': w.id, 'name': w.name, 'order': w.order} for w in World.query.all()],
+        'worlds': [{
+            'id': w.id, 'name': w.name, 'order': w.order,
+            'cover_url': w.cover_url or '', 'alias': w.alias or '',
+            'theme_color': w.theme_color or ''
+        } for w in World.query.all()],
         'characters': [{
             'id': c.id, 'name': c.name, 'description': c.description,
             'thumb_url': c.thumb_url, 'image_url': c.image_url,
@@ -613,7 +667,11 @@ def admin_restore():
     db.session.commit()
 
     for w in data.get('worlds', []):
-        db.session.add(World(id=w['id'], name=w['name'], order=w.get('order', 0)))
+        db.session.add(World(
+            id=w['id'], name=w['name'], order=w.get('order', 0),
+            cover_url=w.get('cover_url', ''), alias=w.get('alias', ''),
+            theme_color=w.get('theme_color', '')
+        ))
     db.session.commit()
 
     for c in data.get('characters', []):

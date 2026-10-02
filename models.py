@@ -11,14 +11,22 @@ class AppMeta(db.Model):
 
 
 class World(db.Model):
-    id         = db.Column(db.Integer, primary_key=True)
-    name       = db.Column(db.String(100), nullable=False)
-    order      = db.Column(db.Integer, default=0)
-    episodes   = db.relationship('Episode',   backref='world', lazy=True)
-    characters = db.relationship('Character', backref='world', lazy=True, cascade='all, delete-orphan')
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(100), nullable=False)
+    order       = db.Column(db.Integer, default=0)
+    cover_url   = db.Column(db.String(500), default='')   # Comics 드롭다운 표지 (2:3 비율 권장)
+    alias       = db.Column(db.String(300), default='')   # 옛 이름/검색 별칭 (쉼표 구분)
+    theme_color = db.Column(db.String(20),  default='')   # 캐릭터 페이지 테마 accent 색 (hex)
+    episodes    = db.relationship('Episode',   backref='world', lazy=True)
+    characters  = db.relationship('Character', backref='world', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
-        return {'id': self.id, 'name': self.name}
+        return {
+            'id': self.id, 'name': self.name,
+            'cover_url': self.cover_url or '',
+            'alias': self.alias or '',
+            'theme_color': self.theme_color or ''
+        }
 
 
 class Episode(db.Model):

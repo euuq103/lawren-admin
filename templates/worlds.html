@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>세계관 관리 — LAWREN103 Admin</title>
+<style>
+  :root { --bg:#020202; --text:#5ef2ff; --muted:#7aa9b0; --accent:#2fd3e0; --line:#17353a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text);
+         min-height:100vh; padding:36px 18px 80px; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:1rem; letter-spacing:.22em; color:var(--accent); text-transform:uppercase; margin-bottom:4px; }
+  p.sub { font-size:.74rem; color:var(--muted); line-height:1.7; margin-bottom:24px; }
+  .nav { font-size:.74rem; margin-bottom:26px; }
+  .nav a { color:var(--muted); text-decoration:none; border:1px solid var(--line); padding:6px 12px; display:inline-block; }
+  .nav a:hover { color:var(--text); border-color:var(--accent); }
+
+  /* 추가 폼 */
+  .addbox { display:flex; gap:8px; margin-bottom:26px; flex-wrap:wrap; }
+  .addbox input[type=text] { flex:1; min-width:200px; }
+  input, button, select { font-family:inherit; }
+  input[type=text], input[type=number] { background:#060d0e; border:1px solid var(--line);
+    color:var(--text); padding:8px 10px; font-size:.8rem; }
+  input[type=text]:focus, input[type=number]:focus { outline:none; border-color:var(--accent); }
+  button { cursor:pointer; border:1px solid var(--line); background:rgba(94,242,255,.04);
+    color:var(--text); padding:8px 14px; font-size:.78rem; transition:border-color .2s, box-shadow .2s; }
+  button:hover { border-color:var(--accent); box-shadow:0 0 8px rgba(47,211,224,.2); }
+  button.danger { color:#ff8a7e; }
+  button.danger:hover { border-color:#ff8a7e; box-shadow:0 0 8px rgba(255,122,110,.25); }
+
+  /* 월드 카드 */
+  .card { border:1px solid var(--line); background:rgba(94,242,255,.02); padding:16px;
+          margin-bottom:18px; display:flex; gap:16px; flex-wrap:wrap; }
+  .cover-col { flex:0 0 120px; }
+  .cover-box { width:120px; aspect-ratio:2/3; border:1px solid var(--line); overflow:hidden;
+               display:flex; align-items:center; justify-content:center; font-size:.7rem;
+               color:var(--muted); background:#060d0e; }
+  .cover-box img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cover-btns { display:flex; gap:6px; margin-top:8px; }
+  .cover-btns button { flex:1; padding:6px 4px; font-size:.7rem; }
+
+  .fields { flex:1; min-width:260px; display:grid; grid-template-columns:90px 1fr; gap:10px 10px; align-items:center; }
+  .fields label { font-size:.72rem; color:var(--muted); }
+  .theme-row { display:flex; gap:8px; align-items:center; }
+  input[type=color] { width:34px; height:28px; padding:0; border:1px solid var(--line);
+                      background:#060d0e; cursor:pointer; }
+  .hex { font-size:.7rem; color:var(--muted); }
+
+  .actions { width:100%; display:flex; justify-content:flex-end; gap:8px; margin-top:6px;
+             border-top:1px dashed var(--line); padding-top:12px; }
+
+  .tip { font-size:.7rem; color:var(--muted); line-height:1.8; border:1px dashed var(--line);
+         padding:12px 14px; margin-top:30px; }
+  .tip b { color:var(--text); }
+  .msg-ok  { color:#7ef2b0; }
+  .msg-err { color:#ff8a7e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Worlds — 세계관 관리</h1>
+  <p class="sub">이름 · 별칭 · 표지 · 테마 색을 한 화면에서 관리합니다.</p>
+  <div class="nav"><a href="/admin/characters">&larr; 캐릭터 관리로</a> <a href="/admin/episodes">에피소드 관리</a></div>
+
+  <!-- 세계관 추가 -->
+  <form class="addbox" method="post" action="/admin/worlds/add">
+    <input type="text" name="name" placeholder="새 세계관 이름" required>
+    <button type="submit">+ 세계관 추가</button>
+  </form>
+
+  {% for w in worlds %}
+  <form class="card" method="post" action="/admin/worlds/edit/{{ w.id }}">
+    <input type="hidden" name="cover_url" id="cover_{{ w.id }}" value="{{ w.cover_url or '' }}">
+
+    <div class="cover-col">
+      <div class="cover-box" id="coverbox_{{ w.id }}">
+        {% if w.cover_url %}<img src="{{ w.cover_url }}" alt="표지">{% else %}표지 없음{% endif %}
+      </div>
+      <div class="cover-btns">
+        <button type="button" onclick="document.getElementById('file_{{ w.id }}').click()">표지 업로드</button>
+        <button type="button" class="danger" onclick="clearCover({{ w.id }})">삭제</button>
+      </div>
+      <input type="file" id="file_{{ w.id }}" accept="image/*" style="display:none" onchange="uploadCover({{ w.id }}, this)">
+    </div>
+
+    <div class="fields">
+      <label>이름</label>
+      <input type="text" name="name" value="{{ w.name }}" required>
+      <label>별칭</label>
+      <input type="text" name="alias" value="{{ w.alias or '' }}" placeholder="쉼표로 구분, 이름 변경 시 옛 이름 자동 추가">
+      <label>테마 색</label>
+      <div class="theme-row">
+        <input type="color" id="pick_{{ w.id }}" value="{{ w.theme_color or '#2fd3e0' }}"
+               oninput="document.getElementById('hexval_{{ w.id }}').textContent=this.value">
+        <span class="hex" id="hexval_{{ w.id }}">{{ w.theme_color or '(기본: 세계관 기존 테마)' }}</span>
+        <button type="button" onclick="resetTheme({{ w.id }})">기본 테마</button>
+      </div>
+      <input type="hidden" name="theme_color" id="theme_{{ w.id }}" value="{{ w.theme_color or '' }}">
+      <label>순서</label>
+      <input type="number" name="order" value="{{ w.order }}" min="0" style="width:90px">
+    </div>
+
+    <div class="actions">
+      <button type="button" class="danger"
+              onclick="if(confirm('{{ w.name }} 세계관을 삭제할까요? (속한 캐릭터도 함께 삭제됩니다)')) window.location='/admin/worlds/delete/{{ w.id }}'">세계관 삭제</button>
+      <button type="submit">저장</button>
+    </div>
+  </form>
+  {% endfor %}
+
+  {% if not worlds %}
+  <p class="sub">세계관이 없습니다. 위에서 추가해보세요.</p>
+  {% endif %}
+
+  <div class="tip">
+    <b>사용 안내</b><br>
+    &bull; <b>표지</b>: 메인 페이지 Comics 드롭다운에 2:3 비율(웹툰 표지) 카드로 표시됩니다. 표지가 없으면 기존 텍스트 버튼으로 표시됩니다.<br>
+    &bull; <b>이름 변경</b>: 옛 이름은 자동으로 별칭에 저장되어 기존 링크(?world=옛이름)가 계속 작동합니다.<br>
+    &bull; <b>테마 색</b>: 캐릭터 페이지의 세계관 테마(포인트색+파티클)에 적용됩니다. 비워두면 기존 기본 테마(정해진 4색)를 사용합니다.<br>
+    &bull; 표지 업로드는 저장 버튼과 별개로 진행되며, 업로드 후 반드시 <b>저장</b>을 눌러야 반영됩니다.
+  </div>
+</div>
+
+<script>
+/* 표지 업로드: 기존 /admin/upload (Cloudinary) 재활용 */
+function uploadCover(id, input){
+  var file = input.files[0];
+  if(!file) return;
+  var box = document.getElementById('coverbox_'+id);
+  box.innerHTML = '업로드 중...';
+  var fd = new FormData();
+  fd.append('file', file);
+  fetch('/admin/upload', { method:'POST', body:fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.url){
+        document.getElementById('cover_'+id).value = d.url;
+        box.innerHTML = '<img src="'+d.url+'" alt="">';
+      } else {
+        box.innerHTML = '업로드 실패';
+        alert('업로드 실패: ' + (d.error || 'unknown'));
+      }
+    })
+    .catch(function(){ box.innerHTML='업로드 실패'; alert('업로드 중 오류가 발생했습니다.'); });
+  input.value = '';
+}
+
+function clearCover(id){
+  document.getElementById('cover_'+id).value = '';
+  document.getElementById('coverbox_'+id).innerHTML = '표지 없음';
+}
+
+/* 기본 테마: 지정 색 지우고 기존 세계관 기본 테마로 복귀 */
+function resetTheme(id){
+  document.getElementById('pick_'+id).value='#2fd3e0';
+  document.getElementById('theme_'+id).value='';
+  document.getElementById('hexval_'+id).textContent='(기본: 세계관 기존 테마)';
+}
+
+/* 컬러픽커 값 → hidden input (hex) */
+document.querySelectorAll('input[type=color]').forEach(function(p){
+  p.addEventListener('input', function(){
+    var id = p.id.replace('pick_','');
+    document.getElementById('theme_'+id).value = p.value;
+  });
+});
+</script>
+</body>
+</html>
