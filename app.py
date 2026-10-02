@@ -342,7 +342,7 @@ def episode_add():
     world_id = int(_wid) if _wid else None
     is_pub   = request.form.get('is_public') == 'on'
     alias    = request.form.get('alias', '').strip()
-    order    = int(request.form.get('order') or 0) or Episode.query.count() + 1
+    order    = int(request.form.get('order') or 0) or Episode.query.filter_by(world_id=world_id).count() + 1
     if title:
         db.session.add(Episode(title=title, world_id=world_id, is_public=is_pub, alias=alias, order=order))
         db.session.commit()
